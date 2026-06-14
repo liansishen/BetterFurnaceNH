@@ -1,0 +1,38 @@
+# Blocks
+tile.betterfurnacenh_iron_furnace.name=铁熔炉
+tile.betterfurnacenh_iron_furnace_lit.name=铁熔炉
+tile.betterfurnacenh_gold_furnace.name=金熔炉
+tile.betterfurnacenh_gold_furnace_lit.name=金熔炉
+tile.betterfurnacenh_diamond_furnace.name=钻石熔炉
+tile.betterfurnacenh_diamond_furnace_lit.name=钻石熔炉
+
+tile.betterfurnacenh_iron_blast_furnace.name=铁高炉
+tile.betterfurnacenh_iron_blast_furnace_lit.name=铁高炉
+tile.betterfurnacenh_gold_blast_furnace.name=金高炉
+tile.betterfurnacenh_gold_blast_furnace_lit.name=金高炉
+tile.betterfurnacenh_diamond_blast_furnace.name=钻石高炉
+tile.betterfurnacenh_diamond_blast_furnace_lit.name=钻石高炉
+
+# Container titles
+container.bfnh.iron_furnace=铁熔炉
+container.bfnh.gold_furnace=金熔炉
+container.bfnh.diamond_furnace=钻石熔炉
+container.bfnh.iron_blast_furnace=铁高炉
+container.bfnh.gold_blast_furnace=金高炉
+container.bfnh.diamond_blast_furnace=钻石高炉
+
+# GUI
+gui.bfnh.empty=空
+
+# Creative tab
+itemGroup.betterfurnacenh=Better Furnace NH
+
+# Config
+betterfurnacenh.config.category.general=Better Furnace NH
+
+betterfurnacenh.config.ironSpeedMultiplier.tooltip=相对于原版熔炉的速度倍率。每个等级叠加相乘。
+betterfurnacenh.config.goldSpeedMultiplier.tooltip=相对于铁熔炉的速度倍率。
+betterfurnacenh.config.diamondSpeedMultiplier.tooltip=相对于金熔炉的速度倍率。
+betterfurnacenh.config.fluidTankCapacity.tooltip=流体槽容量（单位：L）。范围：1000-32000。
+betterfurnacenh.config.lavaBurnPerBucket.tooltip=每 1000L（1 桶）岩浆提供的燃烧时间（tick）。
+betterfurnacenh.config.creosoteBurnPerBucket.tooltip=每 1000L（1 桶）杂酚油提供的燃烧时间（tick）。

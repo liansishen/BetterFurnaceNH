@@ -1,0 +1,38 @@
+# Blocks
+tile.betterfurnacenh_iron_furnace.name=Iron Furnace
+tile.betterfurnacenh_iron_furnace_lit.name=Iron Furnace
+tile.betterfurnacenh_gold_furnace.name=Gold Furnace
+tile.betterfurnacenh_gold_furnace_lit.name=Gold Furnace
+tile.betterfurnacenh_diamond_furnace.name=Diamond Furnace
+tile.betterfurnacenh_diamond_furnace_lit.name=Diamond Furnace
+
+tile.betterfurnacenh_iron_blast_furnace.name=Iron Blast Furnace
+tile.betterfurnacenh_iron_blast_furnace_lit.name=Iron Blast Furnace
+tile.betterfurnacenh_gold_blast_furnace.name=Gold Blast Furnace
+tile.betterfurnacenh_gold_blast_furnace_lit.name=Gold Blast Furnace
+tile.betterfurnacenh_diamond_blast_furnace.name=Diamond Blast Furnace
+tile.betterfurnacenh_diamond_blast_furnace_lit.name=Diamond Blast Furnace
+
+# Container titles
+container.bfnh.iron_furnace=Iron Furnace
+container.bfnh.gold_furnace=Gold Furnace
+container.bfnh.diamond_furnace=Diamond Furnace
+container.bfnh.iron_blast_furnace=Iron Blast Furnace
+container.bfnh.gold_blast_furnace=Gold Blast Furnace
+container.bfnh.diamond_blast_furnace=Diamond Blast Furnace
+
+# GUI
+gui.bfnh.empty=Empty
+
+# Creative tab
+itemGroup.betterfurnacenh=Better Furnace NH
+
+# Config
+betterfurnacenh.config.category.general=Better Furnace NH
+
+betterfurnacenh.config.ironSpeedMultiplier.tooltip=Speed multiplier relative to vanilla furnace. Each tier multiplies cumulatively.
+betterfurnacenh.config.goldSpeedMultiplier.tooltip=Speed multiplier relative to Iron Furnace.
+betterfurnacenh.config.diamondSpeedMultiplier.tooltip=Speed multiplier relative to Gold Furnace.
+betterfurnacenh.config.fluidTankCapacity.tooltip=Fluid tank capacity in L. Range: 1000-32000.
+betterfurnacenh.config.lavaBurnPerBucket.tooltip=Burn time (ticks) per 1000L (1 bucket) of Lava.
+betterfurnacenh.config.creosoteBurnPerBucket.tooltip=Burn time (ticks) per 1000L (1 bucket) of Creosote.
