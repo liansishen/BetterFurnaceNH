@@ -1,106 +1,45 @@
-# Example Forge Mod for Minecraft 1.7.10
+# Better Furnace NH / 更好的熔炉 NH
 
-[![](https://jitpack.io/v/GTNewHorizons/ExampleMod1.7.10.svg)](https://jitpack.io/#GTNewHorizons/ExampleMod1.7.10)
-[![](https://github.com/GTNewHorizons/ExampleMod1.7.10/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/GTNewHorizons/ExampleMod1.7.10/actions/workflows/build-and-test.yml)
+An addon mod for GTNH (GregTech: New Horizons) that adds tiered furnaces with fluid fuel support and blast furnace upgrades.
 
-An example mod for Minecraft 1.7.10 with Forge focussed on a stable, updatable setup.
+GTNH 的附属模组，添加了支持流体燃料的分级熔炉和高炉。
 
-<!-- omit in toc -->
-### Table of Contents
+## Features / 特性
 
-* [Example Forge Mod for Minecraft 1.7.10](#example-forge-mod-for-minecraft-1710)
-    * [Motivation](#motivation)
-    * [Help! I'm stuck!](#help-im-stuck)
-    * [Getting started](#getting-started)
-    * [Features](#features)
-    * [Files](#files)
-    * [Forge's Access Transformers](#forges-access-transformers)
-    * [Mixins](#mixins)
-    * [Advanced](#advanced)
-    * [Feedback wanted](#feedback-wanted)
+- **Iron Furnace / 铁熔炉** — 1.5× faster than vanilla furnace / 速度是原版熔炉的 1.5 倍
+- **Gold Furnace / 金熔炉** — 1.5× faster than Iron Furnace (2.25× total) / 速度是铁熔炉的 1.5 倍（总计 2.25 倍）
+- **Diamond Furnace / 钻石熔炉** — 1.5× faster than Gold Furnace (3.375× total) / 速度是金熔炉的 1.5 倍（总计 3.375 倍）
+- **Fluid Fuel / 流体燃料** — Lava and Creosote can be used as fuel via internal fluid tank / 岩浆和杂酚油可通过内部流体槽作为燃料
+- **Blast Furnace Upgrades / 高炉升级** — Iron/Gold/Diamond blast furnaces (requires Et-Futurum-Requiem), run at 2× speed / 铁/金/钻石高炉（需要 Et-Futurum-Requiem），速度为同级熔炉 2 倍
+- **Configurable / 可配置** — speed, tank capacity, and burn values adjustable via GUI / 速度、容量、燃烧值均可通过 GUI 调整
+- **i18n / 国际化** — English and Simplified Chinese / 英文和简体中文
 
+## Fluid Fuel / 流体燃料
 
-### Motivation
+Right-click with a Lava/Creosote bucket or pipe in with IFluidHandler. Fluid is consumed every 20 ticks while running.
 
-We had our fair share in struggles with build scripts for Minecraft Forge. There are quite a few pitfalls from non-obvious error messages. This Example Project provides you a build system you can adapt to over 90% of Minecraft Forge mods and can easily be updated if need be.
+手持岩浆/杂酚油桶右键熔炉，或用管道输入。运行时每 20 tick 消耗一次。
 
-### Help! I'm stuck!
+| Fluid / 流体 | Burn Time / 燃烧时间 (per 1000L) | Items per 1000L / 每 1000L 烧炼 |
+|---|---|---|
+| Lava / 岩浆 | 20000 ticks | 100 |
+| Creosote / 杂酚油 | 6400 ticks | 32 |
 
-We all have been there! Check out our [FAQ](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/docs/FAQ.md). If that doesn't help, please open an issue.
+Tank capacity default 8000L, max 32000L. / 流体槽默认 8000L，最大 32000L。
 
-### Getting started
+## Configuration / 配置
 
-Creating mod from scratch:
-1. Unzip [project starter](https://github.com/GTNewHorizons/ExampleMod1.7.10/releases/download/master-packages/starter.zip) into project directory.
-2. Replace placeholders in LICENSE-template and rename it to LICENSE, or remove LICENSE-template and put any other license you like on your code. This is an permissive OSS project and we encourage you participate in OSS movement by having permissive license like one in template. You can find out pros and cons of OSS software in [this article](https://www.freecodecamp.org/news/what-is-great-about-developing-open-source-and-what-is-not/)
-3. Ensure your project is under VCS. For example initialise git repository by running `git init; git commit --message "initialized repository"`.
-4. Replace placeholders (edit values in gradle.properties, change example package and class names, etc.)
-5. Run `./gradlew setupDecompWorkspace`
-6. Run `./gradlew build`
-6. Make sure to check out the rest sections of this file.
-7. You are good to go!
+Config file: `config/betterfurnacenh.cfg` or Mods → Better Furnace NH → Config.
 
-We also have described guidelines for existing mod [migration](docs/migration.md) and [porting](docs/porting.md)
+| Setting / 设置 | Default / 默认 | Range / 范围 |
+|---|---|---|
+| Iron Speed / 铁熔炉倍率 | 1.5 | 0.1–100 |
+| Gold Speed / 金熔炉倍率 | 1.5 | 0.1–100 |
+| Diamond Speed / 钻石熔炉倍率 | 1.5 | 0.1–100 |
+| Tank Capacity / 流体槽容量 | 8000 L | 1000–32000 |
+| Lava Burn/Bucket / 岩浆燃烧 | 20000 tick | 1–1000000 |
+| Creosote Burn/Bucket / 杂酚油燃烧 | 6400 tick | 1–1000000 |
 
-### Features
+## License / 许可证
 
- - Updatable: Replace [`build.gradle`](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/build.gradle) with a newer version
- - Optional API artifact (.jar)
- - Optional version replacement in Java files
- - Optional shadowing of dependencies
- - Simplified setup of Mixin and example
- - Scala support (add sources under `src/main/scala/` instead of `src/main/java/`)
- - Optional named developer account for consistent player progression during testing
- - Boilerplate forge mod as starting point
- - Improved warnings for pitfalls
- - Git Tags integration for versioning
- - [Jitpack](https://jitpack.io) CI
- - GitHub CI:
-   - Releasing your artifacts on new tags pushed. Push git tag named after version (e.g. 1.0.0) which will trigger a release of artifacts with according names.
-   - Running smoke test for server startup. On any server crash occurring workflow will fail and print the crash log.
-
-### Files
- - [`build.gradle`](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/build.gradle): This is the core script of the build process. You should not need to tamper with it, unless you are trying to accomplish something out of the ordinary. __Do not touch this file! You will make a future update near impossible if you do so!__
- - [`gradle.properties`](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/gradle.properties): The core configuration file. It includes
- - [`dependencies.gradle[.kts]`](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/dependencies.gradle): Add your mod's dependencies in this file. This is separate from the main build script, so you may replace the [`build.gradle`](https://github.com/SinTh0r4s/ExampleMod1.7.10/blob/main/build.gradle) if an update is available.
- - [`repositories.gradle[.kts]`](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/repositories.gradle): Add your dependencies' repositories. This is separate from the main build script, so you may replace the [`build.gradle`](https://github.com/SinTh0r4s/ExampleMod1.7.10/blob/main/build.gradle) if an update is available.
- - `addon.gradle[.kts]`: Any additional build logic. This is separate from the main build script, so you may replace the [`build.gradle`](https://github.com/SinTh0r4s/ExampleMod1.7.10/blob/main/build.gradle) if an update is available. See [Advanced](#advanced) for more details.
- - [`jitpack.yml`](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/jitpack.yml): Ensures that your mod is available as import over [Jitpack](https://jitpack.io).
- - [`.github/workflows/gradle.yml`](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/.github/workflows/gradle.yml): A simple CI script that will build your mod any time it is pushed to `master` or `main` and publish the result as release in your repository. This feature is free with GitHub if your repository is public.
-
-### Forge's Access Transformers
-
-You may activate Forge's Access Transformers by defining a configuration file in `gradle.properties`.
-
-Check out the [`example-access-transformers`](https://github.com/GTNewHorizons/ExampleMod1.7.10/tree/example-access-transformers) branch for a working example!
-
-> [!WARNING]
-> Access Transformers are bugged and will deny you any sources for the decompiled Minecraft! Your development environment will still work, but you might face some inconveniences. For example, IntelliJ will not permit searches in dependencies without attached sources.
-
-### Mixins
-
-[Mixins](https://github.com/SpongePowered/Mixin) are used to modify vanilla or mod/library code during runtime without having to edit, recompile, and redistribute the original code. For example, mixins can change a hardcoded value, redirect a method call, inject additional code, access private fields/methods, make a class implement your interface, and more. Mixins are an advanced feature which most normal mods will not require.
-
-Documentation about Mixin features can be found here: [Mixin Wiki](https://github.com/SpongePowered/Mixin/wiki) and [MixinExtras Wiki](https://github.com/LlamaLad7/MixinExtras/wiki)
-
-There are many examples of mixins in these mods: [Hodgepodge](https://github.com/GTNewHorizons/Hodgepodge) and [Angelica](https://github.com/GTNewHorizons/Angelica)
-
-To enable Mixins in your project, follow one of the example commits:
-- use [normal mixins](https://github.com/GTNewHorizons/ExampleMod1.7.10/commit/beba55615fa8337b7639f0d5b18db6cc8d4826be) for basic and quick registration
-- use [GTNH IMixins](https://github.com/GTNewHorizons/ExampleMod1.7.10/commit/055cd4f18765a421a86c706f53b62116988297e3) (recommended) for the same thing as below, but in a less verbose and more unified manner using the IMixins api
-- use [GTNH Early/Late mixins](https://github.com/GTNewHorizons/ExampleMod1.7.10/commit/c4df59d92164775b69451f3e690239e93d1fc979) to have full control over the registration logic and check for presence of other mods during runtime to load your mixins
-
-The extra required dependencies are handled automatically after mixins are enabled.
-
-### Advanced
-
-If your project requires custom gradle commands you may add a `addon.gradle[.kts]` to your project. It will be added automatically to the build script. Although we recommend against it, it is sometimes required. When in doubt, feel free to ask us about it. You may break future updates of this build system!
-If you need access to properties modified later in the buildscript, you can also use a `addon.late.gradle[.kts]`.
-For local tweaks that you don't want to commit to Git, like adding extra JVM arguments for testing, use `addon[.late].local.gradle[.kts]`.
-
-### Feedback wanted
-
-If you tried out this build script we would love to head your opinion! Is there any feature missing for you? Did something not work? Please open an issue and we will try to resolve it asap!
-
-Happy modding,\
-[SinTh0r4s](https://github.com/SinTh0r4s), [TheElan](https://github.com/TheElan) and [basdxz](https://github.com/basdxz)
+MIT
