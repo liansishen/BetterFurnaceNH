@@ -6,7 +6,7 @@
 		"description": "Better Furnace NH - A Minecraft mod for GTNH.",
 		"version": "${modVersion}",
 		"mcversion": "${minecraftVersion}",
-		"url": "https://github.com/hepdd/BetterFurnaceNH",
+		"url": "https://github.com/liansishen/BetterFurnaceNH",
 		"updateUrl": "",
 		"authorList": ["liansishen"],
 		"credits": "",
