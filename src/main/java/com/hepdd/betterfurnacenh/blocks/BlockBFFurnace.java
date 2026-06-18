@@ -18,16 +18,20 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.IIcon;
 import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
+import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.FluidContainerRegistry;
 import net.minecraftforge.fluids.FluidStack;
 
 import com.hepdd.betterfurnacenh.BFNH;
+import com.hepdd.betterfurnacenh.client.overlay.GridMath;
 import com.hepdd.betterfurnacenh.tileentities.EnumFurnaceTier;
 import com.hepdd.betterfurnacenh.tileentities.TileEntityBFBlastFurnace;
 import com.hepdd.betterfurnacenh.tileentities.TileEntityBFFurnace;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import gregtech.api.GregTechAPI;
+import gregtech.api.util.GTUtility;
 
 public class BlockBFFurnace extends BlockContainer {
 
@@ -84,6 +88,26 @@ public class BlockBFFurnace extends BlockContainer {
         TileEntityBFFurnace furnace = (TileEntityBFFurnace) te;
 
         ItemStack held = player.getHeldItem();
+
+        if (held != null && GTUtility.isStackInList(held, GregTechAPI.sCrowbarList)) {
+            ForgeDirection targetSide = GridMath
+                .determineWrenchingSide(ForgeDirection.getOrientation(side), hitX, hitY, hitZ);
+            if (targetSide == ForgeDirection.UP || targetSide == ForgeDirection.DOWN) {
+                if (furnace.isHopperInstalled(targetSide)) {
+                    if (!world.isRemote) {
+                        furnace.removeHopper(targetSide);
+                        furnace.markDirty();
+                        world.markBlockForUpdate(x, y, z);
+                        ItemStack hopperDrop = new ItemStack(BFNH.hopperUpgrade, 1);
+                        if (!player.inventory.addItemStackToInventory(hopperDrop)) {
+                            player.dropPlayerItemWithRandomChoice(hopperDrop, false);
+                        }
+                    }
+                    return true;
+                }
+            }
+        }
+
         if (held != null) {
             FluidStack fluid = FluidContainerRegistry.getFluidForFilledItem(held);
             if (fluid != null && furnace.isValidFuel(fluid)) {
@@ -145,6 +169,18 @@ public class BlockBFFurnace extends BlockContainer {
                         entity.motionZ = world.rand.nextGaussian() * 0.05F;
                         world.spawnEntityInWorld(entity);
                     }
+                }
+                int hopperCount = furnace.getInstalledHopperCount();
+                for (int i = 0; i < hopperCount; i++) {
+                    ItemStack hopperStack = new ItemStack(BFNH.hopperUpgrade, 1);
+                    float fx = world.rand.nextFloat() * 0.8F + 0.1F;
+                    float fy = world.rand.nextFloat() * 0.8F + 0.1F;
+                    float fz = world.rand.nextFloat() * 0.8F + 0.1F;
+                    EntityItem entity = new EntityItem(world, x + fx, y + fy, z + fz, hopperStack);
+                    entity.motionX = world.rand.nextGaussian() * 0.05F;
+                    entity.motionY = world.rand.nextGaussian() * 0.05F + 0.2F;
+                    entity.motionZ = world.rand.nextGaussian() * 0.05F;
+                    world.spawnEntityInWorld(entity);
                 }
             }
         }

@@ -9,6 +9,7 @@ import net.minecraft.inventory.SlotFurnace;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.FurnaceRecipes;
 import net.minecraft.tileentity.TileEntityFurnace;
+import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidContainerRegistry;
 import net.minecraftforge.fluids.FluidRegistry;
@@ -27,6 +28,10 @@ public class ContainerBFFurnace extends Container {
     private int lastItemBurnTime;
     private int lastFluidAmount;
     private int lastFluidID;
+    private int lastTopHopperInstalled;
+    private int lastBottomHopperInstalled;
+    private int lastTopHopperEnabled;
+    private int lastBottomHopperEnabled;
 
     public ContainerBFFurnace(InventoryPlayer invPlayer, TileEntityBFFurnace tileFurnace) {
         this.tileFurnace = tileFurnace;
@@ -54,6 +59,10 @@ public class ContainerBFFurnace extends Container {
         FluidStack fluid = tileFurnace.fluidTank.getFluid();
         crafting.sendProgressBarUpdate(this, 4, fluid != null ? fluid.getFluidID() : -1);
         crafting.sendProgressBarUpdate(this, 3, fluid != null ? fluid.amount : 0);
+        crafting.sendProgressBarUpdate(this, 5, tileFurnace.isHopperInstalled(ForgeDirection.UP) ? 1 : 0);
+        crafting.sendProgressBarUpdate(this, 6, tileFurnace.isHopperInstalled(ForgeDirection.DOWN) ? 1 : 0);
+        crafting.sendProgressBarUpdate(this, 7, tileFurnace.isHopperEnabled(ForgeDirection.UP) ? 1 : 0);
+        crafting.sendProgressBarUpdate(this, 8, tileFurnace.isHopperEnabled(ForgeDirection.DOWN) ? 1 : 0);
     }
 
     @Override
@@ -85,6 +94,24 @@ public class ContainerBFFurnace extends Container {
             if (lastFluidAmount != fluidAmount) {
                 crafting.sendProgressBarUpdate(this, 3, fluidAmount);
             }
+
+            int topInst = tileFurnace.isHopperInstalled(ForgeDirection.UP) ? 1 : 0;
+            int botInst = tileFurnace.isHopperInstalled(ForgeDirection.DOWN) ? 1 : 0;
+            int topEn = tileFurnace.isHopperEnabled(ForgeDirection.UP) ? 1 : 0;
+            int botEn = tileFurnace.isHopperEnabled(ForgeDirection.DOWN) ? 1 : 0;
+
+            if (lastTopHopperInstalled != topInst) {
+                crafting.sendProgressBarUpdate(this, 5, topInst);
+            }
+            if (lastBottomHopperInstalled != botInst) {
+                crafting.sendProgressBarUpdate(this, 6, botInst);
+            }
+            if (lastTopHopperEnabled != topEn) {
+                crafting.sendProgressBarUpdate(this, 7, topEn);
+            }
+            if (lastBottomHopperEnabled != botEn) {
+                crafting.sendProgressBarUpdate(this, 8, botEn);
+            }
         }
         lastCookTime = (int) tileFurnace.furnaceCookTime;
         lastBurnTime = (int) tileFurnace.furnaceBurnTime;
@@ -92,6 +119,10 @@ public class ContainerBFFurnace extends Container {
         FluidStack fluid = tileFurnace.fluidTank.getFluid();
         lastFluidAmount = fluid != null ? fluid.amount : 0;
         lastFluidID = fluid != null ? fluid.getFluidID() : -1;
+        lastTopHopperInstalled = tileFurnace.isHopperInstalled(ForgeDirection.UP) ? 1 : 0;
+        lastBottomHopperInstalled = tileFurnace.isHopperInstalled(ForgeDirection.DOWN) ? 1 : 0;
+        lastTopHopperEnabled = tileFurnace.isHopperEnabled(ForgeDirection.UP) ? 1 : 0;
+        lastBottomHopperEnabled = tileFurnace.isHopperEnabled(ForgeDirection.DOWN) ? 1 : 0;
     }
 
     @Override
@@ -120,6 +151,18 @@ public class ContainerBFFurnace extends Container {
                 break;
             case 4:
                 lastFluidID = value;
+                break;
+            case 5:
+                tileFurnace.setHopperInstalled(ForgeDirection.UP, value != 0);
+                break;
+            case 6:
+                tileFurnace.setHopperInstalled(ForgeDirection.DOWN, value != 0);
+                break;
+            case 7:
+                tileFurnace.setHopperEnabled(ForgeDirection.UP, value != 0);
+                break;
+            case 8:
+                tileFurnace.setHopperEnabled(ForgeDirection.DOWN, value != 0);
                 break;
         }
     }

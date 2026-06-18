@@ -2,6 +2,7 @@ package com.hepdd.betterfurnacenh.tileentities;
 
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
+import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.ISidedInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.FurnaceRecipes;
@@ -44,6 +45,12 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
     private int fluidConsumeTimer = 0;
     private float fluidConsumeAccum = 0f;
 
+    private boolean topHopperInstalled = false;
+    private boolean bottomHopperInstalled = false;
+    private boolean topHopperEnabled = true;
+    private boolean bottomHopperEnabled = true;
+    private int hopperCooldown = 0;
+
     public TileEntityBFFurnace() {
         this(EnumFurnaceTier.IRON);
     }
@@ -69,6 +76,167 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
 
     protected void refreshSpeedMultiplier() {
         speedMultiplier = tier.getSpeedMultiplier();
+    }
+
+    public boolean isHopperInstalled(ForgeDirection side) {
+        if (side == ForgeDirection.UP) return topHopperInstalled;
+        if (side == ForgeDirection.DOWN) return bottomHopperInstalled;
+        return false;
+    }
+
+    public boolean isHopperEnabled(ForgeDirection side) {
+        if (side == ForgeDirection.UP) return topHopperEnabled;
+        if (side == ForgeDirection.DOWN) return bottomHopperEnabled;
+        return false;
+    }
+
+    public void setHopperEnabled(ForgeDirection side, boolean enabled) {
+        if (side == ForgeDirection.UP) topHopperEnabled = enabled;
+        else if (side == ForgeDirection.DOWN) bottomHopperEnabled = enabled;
+    }
+
+    public void setHopperInstalled(ForgeDirection side, boolean installed) {
+        if (side == ForgeDirection.UP) topHopperInstalled = installed;
+        else if (side == ForgeDirection.DOWN) bottomHopperInstalled = installed;
+    }
+
+    public boolean installHopper(ForgeDirection side) {
+        if (side == ForgeDirection.UP && !topHopperInstalled) {
+            topHopperInstalled = true;
+            topHopperEnabled = true;
+            return true;
+        }
+        if (side == ForgeDirection.DOWN && !bottomHopperInstalled) {
+            bottomHopperInstalled = true;
+            bottomHopperEnabled = true;
+            return true;
+        }
+        return false;
+    }
+
+    public boolean removeHopper(ForgeDirection side) {
+        if (side == ForgeDirection.UP && topHopperInstalled) {
+            topHopperInstalled = false;
+            topHopperEnabled = true;
+            return true;
+        }
+        if (side == ForgeDirection.DOWN && bottomHopperInstalled) {
+            bottomHopperInstalled = false;
+            bottomHopperEnabled = true;
+            return true;
+        }
+        return false;
+    }
+
+    public int getInstalledHopperCount() {
+        int count = 0;
+        if (topHopperInstalled) count++;
+        if (bottomHopperInstalled) count++;
+        return count;
+    }
+
+    protected boolean isSmeltable(ItemStack stack) {
+        if (stack == null) return false;
+        return FurnaceRecipes.smelting()
+            .getSmeltingResult(stack) != null;
+    }
+
+    private void tickHopperAutoIO() {
+        hopperCooldown++;
+        if (hopperCooldown < Config.hopperTransferRate) return;
+        hopperCooldown = 0;
+
+        if (topHopperInstalled && topHopperEnabled) {
+            doAutoInput();
+        }
+        if (bottomHopperInstalled && bottomHopperEnabled) {
+            doAutoOutput();
+        }
+    }
+
+    private void doAutoInput() {
+        TileEntity te = worldObj.getTileEntity(xCoord, yCoord + 1, zCoord);
+        if (!(te instanceof IInventory)) return;
+        IInventory source = (IInventory) te;
+        ForgeDirection extractSide = ForgeDirection.DOWN;
+
+        if (inventory[0] != null && inventory[0].stackSize >= inventory[0].getMaxStackSize()) return;
+
+        int[] slots;
+        if (source instanceof ISidedInventory) {
+            slots = ((ISidedInventory) source).getAccessibleSlotsFromSide(extractSide.ordinal());
+        } else {
+            slots = new int[source.getSizeInventory()];
+            for (int i = 0; i < slots.length; i++) slots[i] = i;
+        }
+
+        for (int slot : slots) {
+            ItemStack stack = source.getStackInSlot(slot);
+            if (stack == null || stack.stackSize <= 0) continue;
+            if (!isSmeltable(stack)) continue;
+            if (source instanceof ISidedInventory) {
+                if (!((ISidedInventory) source).canExtractItem(slot, stack, extractSide.ordinal())) continue;
+            }
+            if (inventory[0] != null) {
+                if (!inventory[0].isItemEqual(stack) || !ItemStack.areItemStackTagsEqual(inventory[0], stack)) continue;
+            }
+            ItemStack extracted = source.decrStackSize(slot, 1);
+            if (extracted == null || extracted.stackSize <= 0) continue;
+            source.markDirty();
+            if (inventory[0] == null) {
+                inventory[0] = extracted;
+            } else {
+                inventory[0].stackSize += extracted.stackSize;
+            }
+            markDirty();
+            break;
+        }
+    }
+
+    private void doAutoOutput() {
+        if (inventory[2] == null || inventory[2].stackSize <= 0) return;
+        TileEntity te = worldObj.getTileEntity(xCoord, yCoord - 1, zCoord);
+        if (!(te instanceof IInventory)) return;
+        IInventory target = (IInventory) te;
+
+        ItemStack toMove = inventory[2].copy();
+        toMove.stackSize = 1;
+        ForgeDirection insertSide = ForgeDirection.UP;
+
+        int[] slots;
+        if (target instanceof ISidedInventory) {
+            slots = ((ISidedInventory) target).getAccessibleSlotsFromSide(insertSide.ordinal());
+        } else {
+            slots = new int[target.getSizeInventory()];
+            for (int i = 0; i < slots.length; i++) slots[i] = i;
+        }
+
+        for (int slot : slots) {
+            if (target instanceof ISidedInventory) {
+                if (!((ISidedInventory) target).canInsertItem(slot, toMove, insertSide.ordinal())) continue;
+            }
+            ItemStack existing = target.getStackInSlot(slot);
+            int max = target.getInventoryStackLimit();
+            if (existing != null) {
+                if (!existing.isItemEqual(toMove) || !ItemStack.areItemStackTagsEqual(existing, toMove)) continue;
+                int space = Math.min(max, existing.getMaxStackSize()) - existing.stackSize;
+                if (space <= 0) continue;
+                existing.stackSize += 1;
+                inventory[2].stackSize -= 1;
+                if (inventory[2].stackSize <= 0) inventory[2] = null;
+                target.markDirty();
+                markDirty();
+                return;
+            } else {
+                ItemStack copy = toMove.copy();
+                target.setInventorySlotContents(slot, copy);
+                inventory[2].stackSize -= 1;
+                if (inventory[2].stackSize <= 0) inventory[2] = null;
+                target.markDirty();
+                markDirty();
+                return;
+            }
+        }
     }
 
     @Override
@@ -266,6 +434,8 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
                 changed = true;
                 updateBlockState(furnaceBurnTime > 0f);
             }
+
+            tickHopperAutoIO();
         }
 
         if (changed) {
@@ -402,6 +572,11 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
         if (nbt.hasKey("Fluid")) {
             fluidTank.readFromNBT(nbt.getCompoundTag("Fluid"));
         }
+
+        topHopperInstalled = nbt.getBoolean("TopHopper");
+        bottomHopperInstalled = nbt.getBoolean("BottomHopper");
+        topHopperEnabled = nbt.getBoolean("TopHopperEn");
+        bottomHopperEnabled = nbt.getBoolean("BottomHopperEn");
     }
 
     @Override
@@ -429,6 +604,11 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
         NBTTagCompound fluidNbt = new NBTTagCompound();
         fluidTank.writeToNBT(fluidNbt);
         nbt.setTag("Fluid", fluidNbt);
+
+        nbt.setBoolean("TopHopper", topHopperInstalled);
+        nbt.setBoolean("BottomHopper", bottomHopperInstalled);
+        nbt.setBoolean("TopHopperEn", topHopperEnabled);
+        nbt.setBoolean("BottomHopperEn", bottomHopperEnabled);
     }
 
     @Override

@@ -13,6 +13,13 @@ tile.betterfurnacenh_gold_blast_furnace_lit.name=金高炉
 tile.betterfurnacenh_diamond_blast_furnace.name=钻石高炉
 tile.betterfurnacenh_diamond_blast_furnace_lit.name=钻石高炉
 
+# Items
+item.betterfurnacenh_hopper_upgrade.name=漏斗升级组件
+tooltip.bfnh.hopper_upgrade.install=潜行右键熔炉顶面或底面安装
+tooltip.bfnh.hopper_upgrade.input=安装在熔炉顶部：自动输入（%s 个/秒）
+tooltip.bfnh.hopper_upgrade.output=安装在熔炉底部：自动输出（%s 个/秒）
+tooltip.bfnh.hopper_upgrade.remove=使用撬棍可以拆除
+
 # Container titles
 container.bfnh.iron_furnace=铁熔炉
 container.bfnh.gold_furnace=金熔炉
@@ -23,6 +30,10 @@ container.bfnh.diamond_blast_furnace=钻石高炉
 
 # GUI
 gui.bfnh.empty=空
+gui.bfnh.autoInput=自动输入
+gui.bfnh.autoOutput=自动输出
+gui.bfnh.enabled=已启用
+gui.bfnh.disabled=已禁用
 
 # Creative tab
 itemGroup.betterfurnacenh=Better Furnace NH

@@ -3,6 +3,7 @@ package com.hepdd.betterfurnacenh;
 import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
 
@@ -12,6 +13,8 @@ import org.apache.logging.log4j.Logger;
 import com.hepdd.betterfurnacenh.blocks.BlockBFFurnace;
 import com.hepdd.betterfurnacenh.compat.NEICompat;
 import com.hepdd.betterfurnacenh.creativetab.CreativeTabBFNH;
+import com.hepdd.betterfurnacenh.items.ItemHopperUpgrade;
+import com.hepdd.betterfurnacenh.network.BFNHNet;
 import com.hepdd.betterfurnacenh.tileentities.EnumFurnaceTier;
 import com.hepdd.betterfurnacenh.tileentities.TileEntityBFBlastFurnace;
 import com.hepdd.betterfurnacenh.tileentities.TileEntityBFFurnace;
@@ -65,6 +68,8 @@ public class BFNH {
     public static Block diamondBlastFurnaceIdle;
     public static Block diamondBlastFurnaceLit;
 
+    public static Item hopperUpgrade;
+
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         proxy.preInit(event);
@@ -84,6 +89,9 @@ public class BFNH {
         GameRegistry.registerTileEntity(TileEntityBFFurnace.class, MODID + ":furnace");
         GameRegistry.registerTileEntity(TileEntityBFBlastFurnace.class, MODID + ":blast_furnace");
 
+        hopperUpgrade = new ItemHopperUpgrade();
+        GameRegistry.registerItem(hopperUpgrade, "hopper_upgrade");
+
         NetworkRegistry.INSTANCE.registerGuiHandler(this, proxy);
     }
 
@@ -100,6 +108,9 @@ public class BFNH {
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         proxy.init(event);
+        BFNHNet.init();
+
+        GameRegistry.addShapelessRecipe(new ItemStack(hopperUpgrade), new ItemStack(Blocks.hopper));
 
         Object ironMat = GTOreDictUnificator.get(OrePrefixes.plate, Materials.Iron, 1);
         Object goldMat = GTOreDictUnificator.get(OrePrefixes.plate, Materials.Gold, 1);

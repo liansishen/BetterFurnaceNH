@@ -13,6 +13,13 @@ tile.betterfurnacenh_gold_blast_furnace_lit.name=Gold Blast Furnace
 tile.betterfurnacenh_diamond_blast_furnace.name=Diamond Blast Furnace
 tile.betterfurnacenh_diamond_blast_furnace_lit.name=Diamond Blast Furnace
 
+# Items
+item.betterfurnacenh_hopper_upgrade.name=Hopper Upgrade
+tooltip.bfnh.hopper_upgrade.install=Sneak-right-click furnace top or bottom to install
+tooltip.bfnh.hopper_upgrade.input=Installed on top: Auto Input (%s items/s)
+tooltip.bfnh.hopper_upgrade.output=Installed on bottom: Auto Output (%s items/s)
+tooltip.bfnh.hopper_upgrade.remove=Use a crowbar to remove
+
 # Container titles
 container.bfnh.iron_furnace=Iron Furnace
 container.bfnh.gold_furnace=Gold Furnace
@@ -23,6 +30,10 @@ container.bfnh.diamond_blast_furnace=Diamond Blast Furnace
 
 # GUI
 gui.bfnh.empty=Empty
+gui.bfnh.autoInput=Auto Input
+gui.bfnh.autoOutput=Auto Output
+gui.bfnh.enabled=Enabled
+gui.bfnh.disabled=Disabled
 
 # Creative tab
 itemGroup.betterfurnacenh=Better Furnace NH

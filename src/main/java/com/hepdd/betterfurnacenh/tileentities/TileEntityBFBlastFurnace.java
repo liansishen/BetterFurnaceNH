@@ -31,6 +31,13 @@ public class TileEntityBFBlastFurnace extends TileEntityBFFurnace {
     }
 
     @Override
+    protected boolean isSmeltable(ItemStack stack) {
+        if (stack == null) return false;
+        return BlastFurnaceRecipes.smelting()
+            .getSmeltingResult(stack) != null;
+    }
+
+    @Override
     public boolean canSmelt() {
         if (getStackInSlot(0) == null) return false;
         ItemStack result = BlastFurnaceRecipes.smelting()

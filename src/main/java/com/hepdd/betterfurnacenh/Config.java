@@ -17,6 +17,9 @@ public class Config {
     public static int lavaBurnPerBucket = 20000;
     public static int creosoteBurnPerBucket = 6400;
 
+    public static int hopperTransferRate = 8;
+    public static int hopperItemsPerTransfer = 1;
+
     public static void synchronizeConfiguration(File configFile) {
         Config.configFile = configFile;
         Configuration config = new Configuration(configFile);
@@ -72,6 +75,22 @@ public class Config {
             1,
             1000000,
             "betterfurnacenh.config.creosoteBurnPerBucket.tooltip");
+
+        hopperTransferRate = config.getInt(
+            "hopperTransferRate",
+            Configuration.CATEGORY_GENERAL,
+            8,
+            1,
+            200,
+            "betterfurnacenh.config.hopperTransferRate.tooltip");
+
+        hopperItemsPerTransfer = config.getInt(
+            "hopperItemsPerTransfer",
+            Configuration.CATEGORY_GENERAL,
+            1,
+            1,
+            64,
+            "betterfurnacenh.config.hopperItemsPerTransfer.tooltip");
 
         if (config.hasChanged()) {
             config.save();
