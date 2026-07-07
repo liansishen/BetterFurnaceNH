@@ -151,7 +151,10 @@ public class BFNH {
         proxy.postInit(event);
 
         if (!Loader.isModLoaded("etfuturum")) {
-            NEICompat.register();
+            if (event.getSide()
+                .isClient()) {
+                NEICompat.register();
+            }
             return;
         }
 
@@ -205,7 +208,10 @@ public class BFNH {
                 new ItemStack(goldBlastFurnaceIdle));
         }
 
-        NEICompat.register();
+        if (event.getSide()
+            .isClient()) {
+            NEICompat.register();
+        }
     }
 
     @Mod.EventHandler
