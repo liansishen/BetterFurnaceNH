@@ -1,14 +1,93 @@
-
 name: Release tagged build
 
 on:
   push:
-    tags: [ '*' ]
+    tags: [ '[0-9]*' ]
 
 permissions:
   contents: write
 
 jobs:
+  validate:
+    name: Verify merged PR and master CI
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const version = context.ref.replace('refs/tags/', '');
+            if (!/^\d+\.\d+\.\d+$/.test(version)) {
+              throw new Error('Release tags must use a bare version such as 0.2.3.');
+            }
+            const { data: commit } = await github.rest.repos.getCommit({
+              ...context.repo, ref: context.ref
+            });
+            const { data: comparison } = await github.rest.repos.compareCommitsWithBasehead({
+              ...context.repo, basehead: `${commit.sha}...master`
+            });
+            if (!['ahead', 'identical'].includes(comparison.status)) {
+              throw new Error('Release tags must point to commits merged into master.');
+            }
+            const pulls = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
+              ...context.repo, commit_sha: commit.sha
+            });
+            if (!pulls.some(pr => pr.merged_at && pr.base.ref === 'master' && pr.merge_commit_sha === commit.sha)) {
+              throw new Error('Release tags must point to a merged PR commit on master.');
+            }
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              ...context.repo, workflow_id: 'build-and-test.yml', branch: 'master',
+              event: 'push', head_sha: commit.sha, per_page: 1
+            });
+            const run = data.workflow_runs[0];
+            if (!run || run.status !== 'completed' || run.conclusion !== 'success') {
+              throw new Error('Wait for this commit to pass CI on master before releasing.');
+            }
+            core.info(`Release commit ${commit.sha} passed master CI: ${run.html_url}`);
+
   release-tags:
+    needs: validate
     uses: GTNewHorizons/GTNH-Actions-Workflows/.github/workflows/release-tags.yml@master
     secrets: inherit
+
+  release-resource-packs:
+    name: Publish Modernity resource pack
+    needs: release-tags
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Package Modernity resource pack
+        run: |
+          chmod +x gradlew
+          ./gradlew --build-cache --console=plain "-PresourcePackVersion=$RELEASE_VERSION" packageResourcePacks
+      - name: Upload to the tagged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$RELEASE_VERSION" \
+            "build/resourcepacks/Modernity-BetterFurnaceNH-$RELEASE_VERSION.zip" \
+            --repo "$GITHUB_REPOSITORY"
+          gh release view "$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '.assets[].name' > "$RUNNER_TEMP/release-assets.txt"
+          for artifact in \
+            "betterfurnacenh-$RELEASE_VERSION.jar" \
+            "betterfurnacenh-$RELEASE_VERSION-dev.jar" \
+            "betterfurnacenh-$RELEASE_VERSION-sources.jar" \
+            "Modernity-BetterFurnaceNH-$RELEASE_VERSION.zip"; do
+            grep -Fx "$artifact" "$RUNNER_TEMP/release-assets.txt"
+          done

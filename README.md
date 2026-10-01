@@ -59,6 +59,18 @@ Config file: `config/betterfurnacenh.cfg` or Mods → Better Furnace NH → Conf
 | Hopper Transfer Rate / 漏斗传输间隔 | 8 tick | 1–200 |
 | Hopper Items/Transfer / 每次传输数量 | 1 | 1–64 |
 
+## Modernity resource pack / Modernity 适配材质包
+
+Each release includes `Modernity-BetterFurnaceNH-<version>.zip` for the furnace hopper input/output buttons. Place it in the game's `resourcepacks/` directory and enable it above Modernity. See the [resource-pack guide](resourcepacks/README.md) for installation, packaging and artwork licensing.
+
+每个版本同时发布熔炉漏斗输入/输出按钮的 Modernity 适配包。将 ZIP 放入游戏 `resourcepacks/`，启用后置于 Modernity 上方。安装、打包和材质许可见[材质包说明](resourcepacks/README.md)。
+
+## Development and releases / 开发与发布
+
+Create a PR, wait for CI, merge the PR, wait for master CI, then publish through a bare version tag. The release workflow publishes three JARs and the Modernity ZIP together. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+创建 PR，等待 CI 验证，合并 PR，等待主分支 CI 成功，再通过版本标签发布。发布工作流会同时发布三个 JAR 和 Modernity 适配包，详见[发布规范](CONTRIBUTING.md)。
+
 ## License / 许可证
 
 MIT
