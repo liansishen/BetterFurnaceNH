@@ -1,7 +1,6 @@
 package com.hepdd.betterfurnacenh.tileentities;
 
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Items;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.ISidedInventory;
 import net.minecraft.item.ItemStack;
@@ -24,6 +23,7 @@ import net.minecraftforge.fluids.IFluidHandler;
 
 import com.hepdd.betterfurnacenh.Config;
 import com.hepdd.betterfurnacenh.blocks.BlockBFFurnace;
+import com.hepdd.betterfurnacenh.util.HopperItemTransfer;
 
 public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, IFluidHandler {
 
@@ -194,45 +194,18 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
     }
 
     private void doAutoOutput() {
-        if (inventory[2] == null || inventory[2].stackSize <= 0) return;
         TileEntity te = worldObj.getTileEntity(xCoord, yCoord - 1, zCoord);
         if (!(te instanceof IInventory)) return;
         IInventory target = (IInventory) te;
 
-        ItemStack toMove = inventory[2].copy();
-        toMove.stackSize = 1;
-        ForgeDirection insertSide = ForgeDirection.UP;
-
-        int[] slots;
-        if (target instanceof ISidedInventory) {
-            slots = ((ISidedInventory) target).getAccessibleSlotsFromSide(insertSide.ordinal());
-        } else {
-            slots = new int[target.getSizeInventory()];
-            for (int i = 0; i < slots.length; i++) slots[i] = i;
-        }
-
-        for (int slot : slots) {
-            if (target instanceof ISidedInventory) {
-                if (!((ISidedInventory) target).canInsertItem(slot, toMove, insertSide.ordinal())) continue;
-            }
-            ItemStack existing = target.getStackInSlot(slot);
-            int max = target.getInventoryStackLimit();
-            if (existing != null) {
-                if (!existing.isItemEqual(toMove) || !ItemStack.areItemStackTagsEqual(existing, toMove)) continue;
-                int space = Math.min(max, existing.getMaxStackSize()) - existing.stackSize;
-                if (space <= 0) continue;
-                existing.stackSize += 1;
-                inventory[2].stackSize -= 1;
-                if (inventory[2].stackSize <= 0) inventory[2] = null;
-                target.markDirty();
-                markDirty();
-                return;
-            } else {
-                ItemStack copy = toMove.copy();
-                target.setInventorySlotContents(slot, copy);
-                inventory[2].stackSize -= 1;
-                if (inventory[2].stackSize <= 0) inventory[2] = null;
-                target.markDirty();
+        for (int slot : slotsBottom) {
+            ItemStack stack = inventory[slot];
+            if (stack == null || stack.stackSize <= 0) continue;
+            if (!canExtractItem(slot, stack, ForgeDirection.DOWN.ordinal())) continue;
+            ItemStack toMove = stack.copy();
+            toMove.stackSize = 1;
+            if (HopperItemTransfer.insertItem(target, toMove, ForgeDirection.UP)) {
+                decrStackSize(slot, 1);
                 markDirty();
                 return;
             }
@@ -350,7 +323,7 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
     @Override
     public boolean canExtractItem(int slot, ItemStack stack, int side) {
         if (side == 0 && slot == 1) {
-            return stack.getItem() == Items.bucket;
+            return FluidContainerRegistry.isEmptyContainer(stack) && !FluidContainerRegistry.isFilledContainer(stack);
         }
         return true;
     }
@@ -393,14 +366,8 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
                 }
             }
 
-            if (inventory[1] != null) {
-                FluidStack fluidStack = FluidContainerRegistry.getFluidForFilledItem(inventory[1]);
-                if (fluidStack != null && isValidFuel(fluidStack) && fluidTank.fill(fluidStack, false) > 0) {
-                    fluidTank.fill(fluidStack, true);
-                    inventory[1] = inventory[1].getItem()
-                        .getContainerItem(inventory[1]);
-                    changed = true;
-                }
+            if (tryFillFuelContainer()) {
+                changed = true;
             }
 
             if (furnaceBurnTime <= 0f && canSmelt()) {
@@ -441,6 +408,38 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
         if (changed) {
             markDirty();
         }
+    }
+
+    private boolean tryFillFuelContainer() {
+        ItemStack fuel = inventory[1];
+        if (fuel == null) return false;
+        FluidStack fluid = FluidContainerRegistry.getFluidForFilledItem(fuel);
+        if (fluid == null || !isValidFuel(fluid) || fluidTank.fill(fluid, false) != fluid.amount) return false;
+
+        ItemStack empty = FluidContainerRegistry.drainFluidContainer(fuel);
+        if (fuel.stackSize > 1 && empty != null) {
+            ItemStack output = inventory[2];
+            int limit = Math.min(getInventoryStackLimit(), empty.getMaxStackSize());
+            if (output != null) {
+                if (!output.isItemEqual(empty) || !ItemStack.areItemStackTagsEqual(output, empty)) return false;
+                if (output.stackSize + empty.stackSize > limit) return false;
+            } else if (empty.stackSize > limit) {
+                return false;
+            }
+        }
+
+        fluidTank.fill(fluid, true);
+        fuel.stackSize--;
+        if (fuel.stackSize == 0) {
+            inventory[1] = empty;
+        } else if (empty != null) {
+            if (inventory[2] == null) {
+                inventory[2] = empty;
+            } else {
+                inventory[2].stackSize += empty.stackSize;
+            }
+        }
+        return true;
     }
 
     private void tryConsumeFluidFuel() {
