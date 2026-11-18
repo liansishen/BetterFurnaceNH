@@ -11,12 +11,11 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.hepdd.betterfurnacenh.blocks.BlockBFFurnace;
-import com.hepdd.betterfurnacenh.compat.NEICompat;
+import com.hepdd.betterfurnacenh.compat.EFRCompat;
 import com.hepdd.betterfurnacenh.creativetab.CreativeTabBFNH;
 import com.hepdd.betterfurnacenh.items.ItemHopperUpgrade;
 import com.hepdd.betterfurnacenh.network.BFNHNet;
 import com.hepdd.betterfurnacenh.tileentities.EnumFurnaceTier;
-import com.hepdd.betterfurnacenh.tileentities.TileEntityBFBlastFurnace;
 import com.hepdd.betterfurnacenh.tileentities.TileEntityBFFurnace;
 
 import cpw.mods.fml.common.Loader;
@@ -28,7 +27,6 @@ import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.network.NetworkRegistry;
 import cpw.mods.fml.common.registry.GameRegistry;
-import ganymedes01.etfuturum.ModBlocks;
 import gregtech.api.enums.Materials;
 import gregtech.api.enums.OrePrefixes;
 import gregtech.api.util.GTOreDictUnificator;
@@ -38,6 +36,7 @@ import gregtech.api.util.GTOreDictUnificator;
     version = Tags.VERSION,
     name = "BFNH",
     acceptedMinecraftVersions = "[1.7.10]",
+    dependencies = "required-after:gtnhlib;required-after:gregtech;after:etfuturum;after:NotEnoughItems",
     guiFactory = "com.hepdd.betterfurnacenh.config.BFNHGuiFactory")
 public class BFNH {
 
@@ -87,7 +86,10 @@ public class BFNH {
         registerFurnacePair(diamondFurnaceIdle, diamondFurnaceLit, "diamond_furnace");
 
         GameRegistry.registerTileEntity(TileEntityBFFurnace.class, MODID + ":furnace");
-        GameRegistry.registerTileEntity(TileEntityBFBlastFurnace.class, MODID + ":blast_furnace");
+
+        if (Loader.isModLoaded("etfuturum")) {
+            EFRCompat.preInit();
+        }
 
         hopperUpgrade = new ItemHopperUpgrade();
         GameRegistry.registerItem(hopperUpgrade, "hopper_upgrade");
@@ -95,7 +97,7 @@ public class BFNH {
         NetworkRegistry.INSTANCE.registerGuiHandler(this, proxy);
     }
 
-    private void registerFurnacePair(Block idle, Block lit, String name) {
+    public static void registerFurnacePair(Block idle, Block lit, String name) {
         GameRegistry.registerBlock(idle, ItemBlock.class, name);
         GameRegistry.registerBlock(lit, ItemBlock.class, name + "_lit");
         idle.setBlockName(MODID + "_" + name);
@@ -144,74 +146,15 @@ public class BFNH {
             Items.diamond,
             'F',
             new ItemStack(goldFurnaceIdle));
+
+        if (Loader.isModLoaded("etfuturum")) {
+            EFRCompat.init();
+        }
     }
 
     @Mod.EventHandler
     public void postInit(FMLPostInitializationEvent event) {
         proxy.postInit(event);
-
-        if (!Loader.isModLoaded("etfuturum")) {
-            if (event.getSide()
-                .isClient()) {
-                NEICompat.register();
-            }
-            return;
-        }
-
-        LOG.info("Et-Futurum-Requiem detected, registering blast furnaces");
-
-        ironBlastFurnaceIdle = new BlockBFFurnace(false, EnumFurnaceTier.IRON, true);
-        ironBlastFurnaceLit = new BlockBFFurnace(true, EnumFurnaceTier.IRON, true);
-        registerFurnacePair(ironBlastFurnaceIdle, ironBlastFurnaceLit, "iron_blast_furnace");
-
-        goldBlastFurnaceIdle = new BlockBFFurnace(false, EnumFurnaceTier.GOLD, true);
-        goldBlastFurnaceLit = new BlockBFFurnace(true, EnumFurnaceTier.GOLD, true);
-        registerFurnacePair(goldBlastFurnaceIdle, goldBlastFurnaceLit, "gold_blast_furnace");
-
-        diamondBlastFurnaceIdle = new BlockBFFurnace(false, EnumFurnaceTier.DIAMOND, true);
-        diamondBlastFurnaceLit = new BlockBFFurnace(true, EnumFurnaceTier.DIAMOND, true);
-        registerFurnacePair(diamondBlastFurnaceIdle, diamondBlastFurnaceLit, "diamond_blast_furnace");
-
-        Block efrBlastFurnace = ModBlocks.BLAST_FURNACE.get();
-        if (efrBlastFurnace != null) {
-            Object ironMatBlast = GTOreDictUnificator.get(OrePrefixes.plate, Materials.Iron, 1);
-            Object goldMatBlast = GTOreDictUnificator.get(OrePrefixes.plate, Materials.Gold, 1);
-
-            GameRegistry.addRecipe(
-                new ItemStack(ironBlastFurnaceIdle),
-                "III",
-                "IFI",
-                "III",
-                'I',
-                ironMatBlast,
-                'F',
-                new ItemStack(efrBlastFurnace));
-
-            GameRegistry.addRecipe(
-                new ItemStack(goldBlastFurnaceIdle),
-                "III",
-                "IFI",
-                "III",
-                'I',
-                goldMatBlast,
-                'F',
-                new ItemStack(ironBlastFurnaceIdle));
-
-            GameRegistry.addRecipe(
-                new ItemStack(diamondBlastFurnaceIdle),
-                "III",
-                "IFI",
-                "III",
-                'I',
-                Items.diamond,
-                'F',
-                new ItemStack(goldBlastFurnaceIdle));
-        }
-
-        if (event.getSide()
-            .isClient()) {
-            NEICompat.register();
-        }
     }
 
     @Mod.EventHandler

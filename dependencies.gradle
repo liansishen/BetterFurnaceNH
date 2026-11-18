@@ -44,4 +44,5 @@ dependencies {
     implementation("ganymedes01.etfuturum:Et-Futurum-Requiem:2.6.59-GTNH:dev")
     compileOnlyApi("com.github.GTNewHorizons:NewHorizonsCoreMod:2.9.76:dev")
     implementation('com.github.GTNewHorizons:Railcraft:9.17.31:dev')
+    testImplementation("junit:junit:4.13.2")
 }

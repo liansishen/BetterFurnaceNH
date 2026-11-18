@@ -1,10 +1,10 @@
 package com.hepdd.betterfurnacenh.network;
 
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
+import com.gtnewhorizon.gtnhlib.util.ServerThreadUtil;
+import com.hepdd.betterfurnacenh.inventory.ContainerBFFurnace;
 import com.hepdd.betterfurnacenh.tileentities.TileEntityBFFurnace;
 
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -14,33 +14,25 @@ import io.netty.buffer.ByteBuf;
 
 public class PacketToggleHopper implements IMessage {
 
-    private int x;
-    private int y;
-    private int z;
     private boolean top;
 
     public PacketToggleHopper() {}
 
-    public PacketToggleHopper(int x, int y, int z, boolean top) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
+    public PacketToggleHopper(boolean top) {
         this.top = top;
+    }
+
+    public PacketToggleHopper(int x, int y, int z, boolean top) {
+        this(top);
     }
 
     @Override
     public void toBytes(ByteBuf buf) {
-        buf.writeInt(x);
-        buf.writeInt(y);
-        buf.writeInt(z);
         buf.writeBoolean(top);
     }
 
     @Override
     public void fromBytes(ByteBuf buf) {
-        x = buf.readInt();
-        y = buf.readInt();
-        z = buf.readInt();
         top = buf.readBoolean();
     }
 
@@ -48,23 +40,24 @@ public class PacketToggleHopper implements IMessage {
 
         @Override
         public IMessage onMessage(PacketToggleHopper message, MessageContext ctx) {
-            EntityPlayerMP player = ctx.getServerHandler().playerEntity;
-            World world = player.worldObj;
-            TileEntity te = world.getTileEntity(message.x, message.y, message.z);
-            if (te instanceof TileEntityBFFurnace) {
-                TileEntityBFFurnace furnace = (TileEntityBFFurnace) te;
-                if (message.top) {
-                    if (furnace.isHopperInstalled(ForgeDirection.UP)) {
-                        furnace.setHopperEnabled(ForgeDirection.UP, !furnace.isHopperEnabled(ForgeDirection.UP));
-                    }
-                } else {
-                    if (furnace.isHopperInstalled(ForgeDirection.DOWN)) {
-                        furnace.setHopperEnabled(ForgeDirection.DOWN, !furnace.isHopperEnabled(ForgeDirection.DOWN));
-                    }
+            final EntityPlayerMP player = ctx.getServerHandler().playerEntity;
+            final boolean toggleTop = message.top;
+            ServerThreadUtil.addScheduledTask(() -> {
+                if (player == null || player.worldObj == null) return;
+                if (!(player.openContainer instanceof ContainerBFFurnace)) return;
+                ContainerBFFurnace container = (ContainerBFFurnace) player.openContainer;
+                if (!container.canInteractWith(player)) return;
+
+                TileEntityBFFurnace furnace = container.getTileFurnace();
+                if (furnace == null || furnace.isInvalid()) return;
+
+                ForgeDirection dir = toggleTop ? ForgeDirection.UP : ForgeDirection.DOWN;
+                if (furnace.isHopperInstalled(dir)) {
+                    furnace.setHopperEnabled(dir, !furnace.isHopperEnabled(dir));
+                    furnace.markDirty();
+                    container.detectAndSendChanges();
                 }
-                furnace.markDirty();
-                world.markBlockForUpdate(message.x, message.y, message.z);
-            }
+            });
             return null;
         }
     }

@@ -3,6 +3,7 @@ package com.hepdd.betterfurnacenh.tileentities;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.ISidedInventory;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.FurnaceRecipes;
 import net.minecraft.nbt.NBTTagCompound;
@@ -31,6 +32,9 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
     private static final int[] slotsBottom = new int[] { 2, 1 };
     private static final int[] slotsSides = new int[] { 1 };
 
+    private static Fluid cachedCreosote;
+    private static boolean creosoteLookupDone = false;
+
     private ItemStack[] inventory = new ItemStack[3];
     public float furnaceBurnTime;
     public float currentItemBurnTime;
@@ -51,6 +55,18 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
     private boolean bottomHopperEnabled = true;
     private int hopperCooldown = 0;
 
+    private boolean inputRecipeDirty = true;
+    private Item cachedInputItem;
+    private int cachedInputMeta;
+    private NBTTagCompound cachedInputTagRef;
+    private ItemStack cachedSmeltResult;
+
+    private boolean fuelCacheDirty = true;
+    private Item cachedFuelItem;
+    private int cachedFuelMeta;
+    private NBTTagCompound cachedFuelTagRef;
+    private FluidStack cachedFuelFluid;
+
     public TileEntityBFFurnace() {
         this(EnumFurnaceTier.IRON);
     }
@@ -67,7 +83,7 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
 
     public void setTier(EnumFurnaceTier tier) {
         this.tier = tier;
-        this.speedMultiplier = tier.getSpeedMultiplier();
+        refreshSpeedMultiplier();
     }
 
     public float getSpeedMultiplier() {
@@ -135,10 +151,63 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
         return count;
     }
 
-    protected boolean isSmeltable(ItemStack stack) {
-        if (stack == null) return false;
+    protected ItemStack lookupSmeltingResult(ItemStack stack) {
+        if (stack == null) return null;
         return FurnaceRecipes.smelting()
-            .getSmeltingResult(stack) != null;
+            .getSmeltingResult(stack);
+    }
+
+    protected boolean isSmeltable(ItemStack stack) {
+        return stack != null && lookupSmeltingResult(stack) != null;
+    }
+
+    public boolean canSmeltItem(ItemStack stack) {
+        return isSmeltable(stack);
+    }
+
+    protected ItemStack getCachedSmeltingResult() {
+        ItemStack input = inventory[0];
+        if (input == null || input.stackSize <= 0) {
+            cachedInputItem = null;
+            cachedInputTagRef = null;
+            cachedSmeltResult = null;
+            inputRecipeDirty = false;
+            return null;
+        }
+        Item item = input.getItem();
+        int meta = input.getItemDamage();
+        NBTTagCompound tagRef = input.getTagCompound();
+        if (inputRecipeDirty || item != cachedInputItem || meta != cachedInputMeta || tagRef != cachedInputTagRef) {
+            cachedInputItem = item;
+            cachedInputMeta = meta;
+            cachedInputTagRef = tagRef;
+            cachedSmeltResult = lookupSmeltingResult(input);
+            inputRecipeDirty = false;
+        }
+        return cachedSmeltResult;
+    }
+
+    private FluidStack getCachedFuelContainerFluid() {
+        ItemStack fuel = inventory[1];
+        if (fuel == null || fuel.stackSize <= 0) {
+            cachedFuelItem = null;
+            cachedFuelTagRef = null;
+            cachedFuelFluid = null;
+            fuelCacheDirty = false;
+            return null;
+        }
+        Item item = fuel.getItem();
+        int meta = fuel.getItemDamage();
+        NBTTagCompound tagRef = fuel.getTagCompound();
+        if (fuelCacheDirty || item != cachedFuelItem || meta != cachedFuelMeta || tagRef != cachedFuelTagRef) {
+            cachedFuelItem = item;
+            cachedFuelMeta = meta;
+            cachedFuelTagRef = tagRef;
+            FluidStack fluid = FluidContainerRegistry.getFluidForFilledItem(fuel);
+            cachedFuelFluid = (fluid != null && isValidFuel(fluid)) ? fluid : null;
+            fuelCacheDirty = false;
+        }
+        return cachedFuelFluid;
     }
 
     private void tickHopperAutoIO() {
@@ -155,60 +224,110 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
     }
 
     private void doAutoInput() {
+        if (yCoord + 1 >= worldObj.getHeight()) return;
         TileEntity te = worldObj.getTileEntity(xCoord, yCoord + 1, zCoord);
         if (!(te instanceof IInventory)) return;
         IInventory source = (IInventory) te;
-        ForgeDirection extractSide = ForgeDirection.DOWN;
+        ISidedInventory sided = source instanceof ISidedInventory ? (ISidedInventory) source : null;
+        int extractSide = ForgeDirection.DOWN.ordinal();
 
-        if (inventory[0] != null && inventory[0].stackSize >= inventory[0].getMaxStackSize()) return;
-
-        int[] slots;
-        if (source instanceof ISidedInventory) {
-            slots = ((ISidedInventory) source).getAccessibleSlotsFromSide(extractSide.ordinal());
-        } else {
-            slots = new int[source.getSizeInventory()];
-            for (int i = 0; i < slots.length; i++) slots[i] = i;
+        int remainingQuota = Math.max(1, Config.hopperItemsPerTransfer);
+        if (inventory[0] != null) {
+            if (getCachedSmeltingResult() == null) return;
+            int maxStack = Math.min(getInventoryStackLimit(), inventory[0].getMaxStackSize());
+            int space = maxStack - inventory[0].stackSize;
+            if (space <= 0) return;
+            remainingQuota = Math.min(remainingQuota, space);
         }
 
-        for (int slot : slots) {
+        int[] slots = sided != null ? sided.getAccessibleSlotsFromSide(extractSide) : null;
+        int count = sided != null ? (slots != null ? slots.length : 0) : source.getSizeInventory();
+
+        boolean transferred = false;
+        Item lastRejectedItem = null;
+        int lastRejectedMeta = -1;
+
+        for (int i = 0; i < count && remainingQuota > 0; i++) {
+            int slot = sided != null ? slots[i] : i;
             ItemStack stack = source.getStackInSlot(slot);
             if (stack == null || stack.stackSize <= 0) continue;
-            if (!isSmeltable(stack)) continue;
-            if (source instanceof ISidedInventory) {
-                if (!((ISidedInventory) source).canExtractItem(slot, stack, extractSide.ordinal())) continue;
-            }
+
             if (inventory[0] != null) {
-                if (!inventory[0].isItemEqual(stack) || !ItemStack.areItemStackTagsEqual(inventory[0], stack)) continue;
+                if (!inventory[0].isItemEqual(stack) || !ItemStack.areItemStackTagsEqual(inventory[0], stack)) {
+                    continue;
+                }
+                if (sided != null && !sided.canExtractItem(slot, stack, extractSide)) continue;
+            } else {
+                if (sided != null && !sided.canExtractItem(slot, stack, extractSide)) continue;
+                if (stack.getTagCompound() == null && stack.getItem() == lastRejectedItem
+                    && stack.getItemDamage() == lastRejectedMeta) {
+                    continue;
+                }
+                if (!isSmeltable(stack)) {
+                    if (stack.getTagCompound() == null) {
+                        lastRejectedItem = stack.getItem();
+                        lastRejectedMeta = stack.getItemDamage();
+                    }
+                    continue;
+                }
+                int maxStack = Math.min(getInventoryStackLimit(), stack.getMaxStackSize());
+                remainingQuota = Math.min(remainingQuota, maxStack);
             }
-            ItemStack extracted = source.decrStackSize(slot, 1);
+
+            int toExtract = Math.min(remainingQuota, stack.stackSize);
+            if (toExtract <= 0) break;
+
+            ItemStack extracted = source.decrStackSize(slot, toExtract);
             if (extracted == null || extracted.stackSize <= 0) continue;
-            source.markDirty();
+
             if (inventory[0] == null) {
                 inventory[0] = extracted;
+                inputRecipeDirty = true;
+                int maxStack = Math.min(getInventoryStackLimit(), inventory[0].getMaxStackSize());
+                remainingQuota = Math.min(remainingQuota - extracted.stackSize, maxStack - inventory[0].stackSize);
             } else {
                 inventory[0].stackSize += extracted.stackSize;
+                remainingQuota -= extracted.stackSize;
             }
+            transferred = true;
+        }
+
+        if (transferred) {
+            source.markDirty();
             markDirty();
-            break;
         }
     }
 
     private void doAutoOutput() {
+        if (yCoord <= 0) return;
         TileEntity te = worldObj.getTileEntity(xCoord, yCoord - 1, zCoord);
         if (!(te instanceof IInventory)) return;
         IInventory target = (IInventory) te;
 
+        int remainingQuota = Math.max(1, Config.hopperItemsPerTransfer);
+        boolean transferred = false;
+
         for (int slot : slotsBottom) {
+            if (remainingQuota <= 0) break;
             ItemStack stack = inventory[slot];
             if (stack == null || stack.stackSize <= 0) continue;
             if (!canExtractItem(slot, stack, ForgeDirection.DOWN.ordinal())) continue;
+
+            int tryCount = Math.min(remainingQuota, stack.stackSize);
             ItemStack toMove = stack.copy();
-            toMove.stackSize = 1;
+            toMove.stackSize = tryCount;
             if (HopperItemTransfer.insertItem(target, toMove, ForgeDirection.UP)) {
-                decrStackSize(slot, 1);
-                markDirty();
-                return;
+                int moved = tryCount - toMove.stackSize;
+                if (moved > 0) {
+                    decrStackSize(slot, moved);
+                    remainingQuota -= moved;
+                    transferred = true;
+                }
             }
+        }
+
+        if (transferred) {
+            markDirty();
         }
     }
 
@@ -225,6 +344,9 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
     @Override
     public ItemStack decrStackSize(int slot, int amount) {
         if (inventory[slot] != null) {
+            if (slot == 0) inputRecipeDirty = true;
+            else if (slot == 1) fuelCacheDirty = true;
+
             if (inventory[slot].stackSize <= amount) {
                 ItemStack stack = inventory[slot];
                 inventory[slot] = null;
@@ -242,6 +364,9 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
     @Override
     public ItemStack getStackInSlotOnClosing(int slot) {
         if (inventory[slot] != null) {
+            if (slot == 0) inputRecipeDirty = true;
+            else if (slot == 1) fuelCacheDirty = true;
+
             ItemStack stack = inventory[slot];
             inventory[slot] = null;
             return stack;
@@ -255,6 +380,15 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
         if (stack != null && stack.stackSize > getInventoryStackLimit()) {
             stack.stackSize = getInventoryStackLimit();
         }
+        if (slot == 0) inputRecipeDirty = true;
+        else if (slot == 1) fuelCacheDirty = true;
+    }
+
+    @Override
+    public void markDirty() {
+        inputRecipeDirty = true;
+        fuelCacheDirty = true;
+        super.markDirty();
     }
 
     @Override
@@ -332,15 +466,25 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
         return furnaceBurnTime > 0f;
     }
 
+    public static int computeCookProgressScaled(float cookTime, int scale) {
+        if (cookTime <= 0f || scale <= 0) return 0;
+        int scaled = (int) (cookTime * scale / 200f);
+        return Math.max(0, Math.min(scaled, scale));
+    }
+
+    public static int computeBurnTimeScaled(float burnTime, float itemBurnTime, int scale) {
+        if (burnTime <= 0f || scale <= 0) return 0;
+        float denom = itemBurnTime > 0f ? itemBurnTime : burnTime;
+        int scaled = (int) (burnTime * scale / denom);
+        return Math.max(0, Math.min(scaled, scale));
+    }
+
     public int getCookProgressScaled(int scale) {
-        return (int) (furnaceCookTime * scale / 200f);
+        return computeCookProgressScaled(furnaceCookTime, scale);
     }
 
     public int getBurnTimeRemainingScaled(int scale) {
-        if (currentItemBurnTime <= 0f) {
-            currentItemBurnTime = 200f;
-        }
-        return (int) (furnaceBurnTime * scale / currentItemBurnTime);
+        return computeBurnTimeScaled(furnaceBurnTime, currentItemBurnTime, scale);
     }
 
     @Override
@@ -355,7 +499,7 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
             }
 
             if (furnaceBurnTime > 0f) {
-                furnaceBurnTime -= speedMultiplier;
+                furnaceBurnTime = Math.max(0f, furnaceBurnTime - speedMultiplier);
             }
 
             fluidConsumeTimer++;
@@ -382,6 +526,7 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
                             inventory[1] = inventory[1].getItem()
                                 .getContainerItem(inventory[1]);
                         }
+                        fuelCacheDirty = true;
                     }
                 }
             }
@@ -412,11 +557,15 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
 
     private boolean tryFillFuelContainer() {
         ItemStack fuel = inventory[1];
-        if (fuel == null) return false;
-        FluidStack fluid = FluidContainerRegistry.getFluidForFilledItem(fuel);
-        if (fluid == null || !isValidFuel(fluid) || fluidTank.fill(fluid, false) != fluid.amount) return false;
+        if (fuel == null || fuel.stackSize <= 0) return false;
+        FluidStack fluid = getCachedFuelContainerFluid();
+        if (fluid == null) return false;
+        if (fluidTank.getFluidAmount() + fluid.amount > fluidTank.getCapacity()) return false;
+        if (fluidTank.fill(fluid, false) != fluid.amount) return false;
 
-        ItemStack empty = FluidContainerRegistry.drainFluidContainer(fuel);
+        ItemStack singleFuel = fuel.copy();
+        singleFuel.stackSize = 1;
+        ItemStack empty = FluidContainerRegistry.drainFluidContainer(singleFuel);
         if (fuel.stackSize > 1 && empty != null) {
             ItemStack output = inventory[2];
             int limit = Math.min(getInventoryStackLimit(), empty.getMaxStackSize());
@@ -430,7 +579,7 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
 
         fluidTank.fill(fluid, true);
         fuel.stackSize--;
-        if (fuel.stackSize == 0) {
+        if (fuel.stackSize <= 0) {
             inventory[1] = empty;
         } else if (empty != null) {
             if (inventory[2] == null) {
@@ -439,6 +588,7 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
                 inventory[2].stackSize += empty.stackSize;
             }
         }
+        fuelCacheDirty = true;
         return true;
     }
 
@@ -447,13 +597,14 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
         if (fluid == null || fluid.amount <= 0) return;
 
         int burnPerBucket = 0;
-        Fluid lava = FluidRegistry.LAVA;
-        Fluid creosote = FluidRegistry.getFluid("creosote");
-
-        if (lava != null && fluid.isFluidEqual(new FluidStack(lava, 1))) {
+        Fluid fluidType = fluid.getFluid();
+        if (fluidType == FluidRegistry.LAVA) {
             burnPerBucket = Config.lavaBurnPerBucket;
-        } else if (creosote != null && fluid.isFluidEqual(new FluidStack(creosote, 1))) {
-            burnPerBucket = Config.creosoteBurnPerBucket;
+        } else {
+            Fluid creosote = getCreosoteFluid();
+            if (creosote != null && fluidType == creosote) {
+                burnPerBucket = Config.creosoteBurnPerBucket;
+            }
         }
 
         if (burnPerBucket <= 0) return;
@@ -467,47 +618,58 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
         fluidTank.drain(consume, true);
         fluidConsumeAccum -= consume;
 
-        currentItemBurnTime = 20f * speedMultiplier;
-        furnaceBurnTime += currentItemBurnTime;
+        float addedBurn = 20f * speedMultiplier;
+        furnaceBurnTime += addedBurn;
+        if (furnaceBurnTime > currentItemBurnTime) {
+            currentItemBurnTime = furnaceBurnTime;
+        } else if (currentItemBurnTime <= 0f) {
+            currentItemBurnTime = addedBurn;
+        }
     }
 
     public boolean canSmelt() {
-        if (inventory[0] == null) return false;
-        ItemStack result = FurnaceRecipes.smelting()
-            .getSmeltingResult(inventory[0]);
+        ItemStack result = getCachedSmeltingResult();
         if (result == null) return false;
-        if (inventory[2] == null) return true;
-        if (!inventory[2].isItemEqual(result)) return false;
-        int newSize = inventory[2].stackSize + result.stackSize;
-        return newSize <= getInventoryStackLimit() && newSize <= inventory[2].getMaxStackSize();
+        ItemStack output = inventory[2];
+        if (output == null) return true;
+        if (!output.isItemEqual(result) || !ItemStack.areItemStackTagsEqual(output, result)) return false;
+        int newSize = output.stackSize + result.stackSize;
+        return newSize <= getInventoryStackLimit() && newSize <= output.getMaxStackSize();
     }
 
     public void smeltItem() {
         if (!canSmelt()) return;
-        ItemStack result = FurnaceRecipes.smelting()
-            .getSmeltingResult(inventory[0]);
+        ItemStack result = getCachedSmeltingResult();
+        if (result == null) return;
         if (inventory[2] == null) {
             inventory[2] = result.copy();
-        } else if (inventory[2].getItem() == result.getItem()) {
+        } else {
             inventory[2].stackSize += result.stackSize;
         }
-        inventory[0].stackSize--;
-        if (inventory[0].stackSize <= 0) {
-            inventory[0] = null;
-        }
+        decrStackSize(0, 1);
     }
 
     protected void updateBlockState(boolean burning) {
         BlockBFFurnace.updateFurnaceBlockState(burning, worldObj, xCoord, yCoord, zCoord);
     }
 
-    public boolean isValidFuel(FluidStack fluid) {
-        Fluid lava = FluidRegistry.LAVA;
-        Fluid creosote = FluidRegistry.getFluid("creosote");
+    private static Fluid getCreosoteFluid() {
+        if (!creosoteLookupDone) {
+            cachedCreosote = FluidRegistry.getFluid("creosote");
+            creosoteLookupDone = true;
+        }
+        return cachedCreosote;
+    }
+
+    public boolean isValidFuel(Fluid fluid) {
         if (fluid == null) return false;
-        if (lava != null && fluid.isFluidEqual(new FluidStack(lava, 1))) return true;
-        if (creosote != null && fluid.isFluidEqual(new FluidStack(creosote, 1))) return true;
-        return false;
+        if (fluid == FluidRegistry.LAVA) return true;
+        Fluid creosote = getCreosoteFluid();
+        return creosote != null && fluid == creosote;
+    }
+
+    public boolean isValidFuel(FluidStack fluid) {
+        return fluid != null && isValidFuel(fluid.getFluid());
     }
 
     @Override
@@ -528,7 +690,7 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
 
     @Override
     public boolean canFill(ForgeDirection from, Fluid fluid) {
-        return isValidFuel(new FluidStack(fluid, 1));
+        return isValidFuel(fluid);
     }
 
     @Override
@@ -539,6 +701,34 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
     @Override
     public FluidTankInfo[] getTankInfo(ForgeDirection from) {
         return new FluidTankInfo[] { fluidTank.getInfo() };
+    }
+
+    public static float readCompatibleNonNegativeFloat(NBTTagCompound nbt, String key) {
+        if (nbt == null) return 0f;
+        if (nbt.hasKey(key, 5)) {
+            float val = nbt.getFloat(key);
+            return Float.isNaN(val) ? 0f : Math.max(0f, val);
+        }
+        if (nbt.hasKey(key, 99)) {
+            return Math.max(0f, nbt.getShort(key));
+        }
+        return 0f;
+    }
+
+    public static float resolveCompatibleItemBurnTime(NBTTagCompound nbt, float burnTime, int fallbackSlotBurnTime) {
+        if (nbt != null && nbt.hasKey("ItemBurnTime", 99)) {
+            float saved = nbt.getFloat("ItemBurnTime");
+            if (Float.isNaN(saved) || saved < 0f) saved = 0f;
+            if (burnTime > 0f && saved < burnTime) {
+                return burnTime;
+            }
+            return saved;
+        }
+        int safeSlotBurn = Math.max(0, fallbackSlotBurnTime);
+        if (burnTime <= 0f) {
+            return safeSlotBurn;
+        }
+        return safeSlotBurn >= burnTime ? safeSlotBurn : Math.max(burnTime, 200f);
     }
 
     @Override
@@ -553,14 +743,19 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
                 inventory[slot] = ItemStack.loadItemStackFromNBT(itemTag);
             }
         }
-        furnaceBurnTime = nbt.getShort("BurnTime");
-        furnaceCookTime = nbt.getShort("CookTime");
-        currentItemBurnTime = TileEntityFurnace.getItemBurnTime(inventory[1]);
+        inputRecipeDirty = true;
+        fuelCacheDirty = true;
+
+        furnaceBurnTime = readCompatibleNonNegativeFloat(nbt, "BurnTime");
+        furnaceCookTime = readCompatibleNonNegativeFloat(nbt, "CookTime");
+        int fallbackSlotBurn = inventory[1] != null ? TileEntityFurnace.getItemBurnTime(inventory[1]) : 0;
+        currentItemBurnTime = resolveCompatibleItemBurnTime(nbt, furnaceBurnTime, fallbackSlotBurn);
+        fluidConsumeAccum = readCompatibleNonNegativeFloat(nbt, "FluidConsumeAccum");
 
         int tierOrdinal = nbt.getInteger("Tier");
-        if (tierOrdinal >= 0 && tierOrdinal < EnumFurnaceTier.values().length) {
-            tier = EnumFurnaceTier.values()[tierOrdinal];
-            speedMultiplier = tier.getSpeedMultiplier();
+        if (tierOrdinal >= 0 && tierOrdinal < EnumFurnaceTier.VALUES.length) {
+            tier = EnumFurnaceTier.VALUES[tierOrdinal];
+            refreshSpeedMultiplier();
         }
 
         if (nbt.hasKey("CustomName", 8)) {
@@ -568,21 +763,23 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
         }
 
         fluidTank.setCapacity(Config.fluidTankCapacity);
-        if (nbt.hasKey("Fluid")) {
+        if (nbt.hasKey("Fluid", 10)) {
             fluidTank.readFromNBT(nbt.getCompoundTag("Fluid"));
         }
 
         topHopperInstalled = nbt.getBoolean("TopHopper");
         bottomHopperInstalled = nbt.getBoolean("BottomHopper");
-        topHopperEnabled = nbt.getBoolean("TopHopperEn");
-        bottomHopperEnabled = nbt.getBoolean("BottomHopperEn");
+        topHopperEnabled = !nbt.hasKey("TopHopperEn") || nbt.getBoolean("TopHopperEn");
+        bottomHopperEnabled = !nbt.hasKey("BottomHopperEn") || nbt.getBoolean("BottomHopperEn");
     }
 
     @Override
     public void writeToNBT(NBTTagCompound nbt) {
         super.writeToNBT(nbt);
-        nbt.setShort("BurnTime", (short) furnaceBurnTime);
-        nbt.setShort("CookTime", (short) furnaceCookTime);
+        nbt.setFloat("BurnTime", furnaceBurnTime);
+        nbt.setFloat("CookTime", furnaceCookTime);
+        nbt.setFloat("ItemBurnTime", currentItemBurnTime);
+        nbt.setFloat("FluidConsumeAccum", fluidConsumeAccum);
         nbt.setInteger("Tier", tier.ordinal());
 
         NBTTagList items = new NBTTagList();
@@ -613,12 +810,22 @@ public class TileEntityBFFurnace extends TileEntity implements ISidedInventory, 
     @Override
     public Packet getDescriptionPacket() {
         NBTTagCompound nbt = new NBTTagCompound();
-        writeToNBT(nbt);
+        nbt.setBoolean("TopHopper", topHopperInstalled);
+        nbt.setBoolean("BottomHopper", bottomHopperInstalled);
+        if (hasCustomInventoryName()) {
+            nbt.setString("CustomName", customName);
+        }
         return new S35PacketUpdateTileEntity(xCoord, yCoord, zCoord, 1, nbt);
     }
 
     @Override
     public void onDataPacket(NetworkManager net, S35PacketUpdateTileEntity pkt) {
-        readFromNBT(pkt.func_148857_g());
+        NBTTagCompound nbt = pkt.func_148857_g();
+        if (nbt == null) return;
+        topHopperInstalled = nbt.getBoolean("TopHopper");
+        bottomHopperInstalled = nbt.getBoolean("BottomHopper");
+        if (nbt.hasKey("CustomName", 8)) {
+            customName = nbt.getString("CustomName");
+        }
     }
 }

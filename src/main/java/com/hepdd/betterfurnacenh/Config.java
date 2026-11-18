@@ -4,6 +4,8 @@ import java.io.File;
 
 import net.minecraftforge.common.config.Configuration;
 
+import com.hepdd.betterfurnacenh.tileentities.EnumFurnaceTier;
+
 public class Config {
 
     public static File configFile;
@@ -91,6 +93,8 @@ public class Config {
             1,
             64,
             "betterfurnacenh.config.hopperItemsPerTransfer.tooltip");
+
+        EnumFurnaceTier.refreshCachedMultipliers();
 
         if (config.hasChanged()) {
             config.save();

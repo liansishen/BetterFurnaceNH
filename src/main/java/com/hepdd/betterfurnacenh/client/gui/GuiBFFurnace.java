@@ -56,52 +56,51 @@ public class GuiBFFurnace extends GuiContainer {
     @Override
     public void initGui() {
         super.initGui();
-        inputButton = null;
-        outputButton = null;
-        int btnId = 100;
-        if (tileFurnace.isHopperInstalled(ForgeDirection.UP)) {
-            inputButton = new GuiButtonHopperToggle(
-                btnId++,
-                guiLeft + BTN_INPUT_X,
-                guiTop + BTN_INPUT_Y,
-                true,
-                tileFurnace.isHopperEnabled(ForgeDirection.UP),
-                tileFurnace);
-            this.buttonList.add(inputButton);
+        inputButton = new GuiButtonHopperToggle(
+            100,
+            guiLeft + BTN_INPUT_X,
+            guiTop + BTN_INPUT_Y,
+            true,
+            tileFurnace.isHopperEnabled(ForgeDirection.UP));
+        outputButton = new GuiButtonHopperToggle(
+            101,
+            guiLeft + BTN_OUTPUT_X,
+            guiTop + BTN_OUTPUT_Y,
+            false,
+            tileFurnace.isHopperEnabled(ForgeDirection.DOWN));
+        this.buttonList.add(inputButton);
+        this.buttonList.add(outputButton);
+        syncHopperButtons();
+    }
+
+    private void syncHopperButtons() {
+        if (inputButton != null) {
+            boolean topInst = tileFurnace.isHopperInstalled(ForgeDirection.UP);
+            inputButton.visible = topInst;
+            inputButton.enabled = topInst;
+            inputButton.setEnabled(tileFurnace.isHopperEnabled(ForgeDirection.UP));
         }
-        if (tileFurnace.isHopperInstalled(ForgeDirection.DOWN)) {
-            outputButton = new GuiButtonHopperToggle(
-                btnId++,
-                guiLeft + BTN_OUTPUT_X,
-                guiTop + BTN_OUTPUT_Y,
-                false,
-                tileFurnace.isHopperEnabled(ForgeDirection.DOWN),
-                tileFurnace);
-            this.buttonList.add(outputButton);
+        if (outputButton != null) {
+            boolean botInst = tileFurnace.isHopperInstalled(ForgeDirection.DOWN);
+            outputButton.visible = botInst;
+            outputButton.enabled = botInst;
+            outputButton.setEnabled(tileFurnace.isHopperEnabled(ForgeDirection.DOWN));
         }
     }
 
     @Override
     public void updateScreen() {
         super.updateScreen();
-        if (inputButton != null) {
-            inputButton.setEnabled(tileFurnace.isHopperEnabled(ForgeDirection.UP));
-        }
-        if (outputButton != null) {
-            outputButton.setEnabled(tileFurnace.isHopperEnabled(ForgeDirection.DOWN));
-        }
+        syncHopperButtons();
     }
 
     @Override
     protected void actionPerformed(net.minecraft.client.gui.GuiButton button) {
         if (button instanceof GuiButtonHopperToggle) {
             GuiButtonHopperToggle hopperBtn = (GuiButtonHopperToggle) button;
-            BFNHNet.channel.sendToServer(
-                new PacketToggleHopper(
-                    tileFurnace.xCoord,
-                    tileFurnace.yCoord,
-                    tileFurnace.zCoord,
-                    hopperBtn.isInput()));
+            if (hopperBtn.visible && hopperBtn.enabled) {
+                BFNHNet.channel.sendToServer(new PacketToggleHopper(hopperBtn.isInput()));
+            }
         }
     }
 
@@ -127,7 +126,7 @@ public class GuiBFFurnace extends GuiContainer {
             drawHoveringText(tooltip, x, y, fontRendererObj);
         }
 
-        if (inputButton != null) {
+        if (inputButton != null && inputButton.visible) {
             int bx = BTN_INPUT_X;
             int by = BTN_INPUT_Y;
             if (x >= bx && x < bx + GuiButtonHopperToggle.BUTTON_SIZE
@@ -141,7 +140,7 @@ public class GuiBFFurnace extends GuiContainer {
                 drawHoveringText(tooltip, x, y, fontRendererObj);
             }
         }
-        if (outputButton != null) {
+        if (outputButton != null && outputButton.visible) {
             int bx = BTN_OUTPUT_X;
             int by = BTN_OUTPUT_Y;
             if (x >= bx && x < bx + GuiButtonHopperToggle.BUTTON_SIZE
@@ -159,6 +158,8 @@ public class GuiBFFurnace extends GuiContainer {
 
     @Override
     protected void drawGuiContainerBackgroundLayer(float partialTicks, int mouseX, int mouseY) {
+        syncHopperButtons();
+
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         mc.getTextureManager()
             .bindTexture(FURNACE_TEXTURE);

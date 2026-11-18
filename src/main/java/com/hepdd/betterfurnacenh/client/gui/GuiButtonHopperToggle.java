@@ -33,13 +33,15 @@ public class GuiButtonHopperToggle extends GuiButton {
 
     private final boolean isInput;
     private boolean enabled2;
-    private final TileEntityBFFurnace furnace;
 
-    public GuiButtonHopperToggle(int id, int x, int y, boolean isInput, boolean enabled, TileEntityBFFurnace furnace) {
+    public GuiButtonHopperToggle(int id, int x, int y, boolean isInput, boolean enabled) {
         super(id, x, y, BUTTON_SIZE, BUTTON_SIZE, "");
         this.isInput = isInput;
         this.enabled2 = enabled;
-        this.furnace = furnace;
+    }
+
+    public GuiButtonHopperToggle(int id, int x, int y, boolean isInput, boolean enabled, TileEntityBFFurnace furnace) {
+        this(id, x, y, isInput, enabled);
     }
 
     public void setEnabled(boolean enabled) {
@@ -65,14 +67,20 @@ public class GuiButtonHopperToggle extends GuiButton {
         mc.getTextureManager()
             .bindTexture(tex);
 
+        drawScaledTexturedRect(this.xPosition, this.yPosition, BUTTON_SIZE, BUTTON_SIZE, TEXTURE_SIZE);
+
         boolean hover = mouseX >= this.xPosition && mouseY >= this.yPosition
             && mouseX < this.xPosition + this.width
             && mouseY < this.yPosition + this.height;
         if (hover) {
-            GL11.glColor4f(1.2F, 1.2F, 1.2F, 1.0F);
+            drawRect(
+                this.xPosition,
+                this.yPosition,
+                this.xPosition + this.width,
+                this.yPosition + this.height,
+                0x33FFFFFF);
         }
 
-        drawScaledTexturedRect(this.xPosition, this.yPosition, BUTTON_SIZE, BUTTON_SIZE, TEXTURE_SIZE);
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
