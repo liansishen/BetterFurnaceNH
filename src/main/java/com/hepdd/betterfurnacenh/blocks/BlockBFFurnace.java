@@ -23,10 +23,9 @@ import net.minecraftforge.fluids.FluidContainerRegistry;
 import net.minecraftforge.fluids.FluidStack;
 
 import com.hepdd.betterfurnacenh.BFNH;
-import com.hepdd.betterfurnacenh.client.overlay.GridMath;
 import com.hepdd.betterfurnacenh.tileentities.EnumFurnaceTier;
-import com.hepdd.betterfurnacenh.tileentities.TileEntityBFBlastFurnace;
 import com.hepdd.betterfurnacenh.tileentities.TileEntityBFFurnace;
+import com.hepdd.betterfurnacenh.util.WrenchGridUtil;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -72,11 +71,12 @@ public class BlockBFFurnace extends BlockContainer {
         }
     }
 
+    public EnumFurnaceTier getTier() {
+        return tier;
+    }
+
     @Override
     public TileEntity createNewTileEntity(World world, int meta) {
-        if (isBlastFurnace) {
-            return new TileEntityBFBlastFurnace(tier);
-        }
         return new TileEntityBFFurnace(tier);
     }
 
@@ -90,7 +90,7 @@ public class BlockBFFurnace extends BlockContainer {
         ItemStack held = player.getHeldItem();
 
         if (held != null && GTUtility.isStackInList(held, GregTechAPI.sCrowbarList)) {
-            ForgeDirection targetSide = GridMath
+            ForgeDirection targetSide = WrenchGridUtil
                 .determineWrenchingSide(ForgeDirection.getOrientation(side), hitX, hitY, hitZ);
             if (targetSide == ForgeDirection.UP || targetSide == ForgeDirection.DOWN) {
                 if (furnace.isHopperInstalled(targetSide)) {
@@ -111,12 +111,20 @@ public class BlockBFFurnace extends BlockContainer {
         if (held != null) {
             FluidStack fluid = FluidContainerRegistry.getFluidForFilledItem(held);
             if (fluid != null && furnace.isValidFuel(fluid)) {
-                int filled = furnace.fill(null, fluid, false);
-                if (filled > 0) {
+                if (world.isRemote) {
+                    return true;
+                }
+                if (furnace.fill(null, fluid, false) == fluid.amount) {
                     furnace.fill(null, fluid, true);
                     if (!player.capabilities.isCreativeMode) {
-                        ItemStack empty = held.getItem()
-                            .getContainerItem(held);
+                        ItemStack singleHeld = held.copy();
+                        singleHeld.stackSize = 1;
+                        ItemStack empty = FluidContainerRegistry.drainFluidContainer(singleHeld);
+                        if (empty == null && singleHeld.getItem()
+                            .hasContainerItem(singleHeld)) {
+                            empty = singleHeld.getItem()
+                                .getContainerItem(singleHeld);
+                        }
                         held.stackSize--;
                         if (held.stackSize <= 0) {
                             player.inventory.setInventorySlotContents(player.inventory.currentItem, empty);
@@ -125,7 +133,9 @@ public class BlockBFFurnace extends BlockContainer {
                                 player.dropPlayerItemWithRandomChoice(empty, false);
                             }
                         }
+                        player.inventoryContainer.detectAndSendChanges();
                     }
+                    furnace.markDirty();
                     return true;
                 }
             }
@@ -195,8 +205,11 @@ public class BlockBFFurnace extends BlockContainer {
         int meta = world.getBlockMetadata(x, y, z);
         TileEntity te = world.getTileEntity(x, y, z);
         keepInventory = true;
-        world.setBlock(x, y, z, targetBlock);
-        keepInventory = false;
+        try {
+            world.setBlock(x, y, z, targetBlock);
+        } finally {
+            keepInventory = false;
+        }
         world.setBlockMetadataWithNotify(x, y, z, meta, 2);
         if (te != null) {
             te.validate();
@@ -268,6 +281,7 @@ public class BlockBFFurnace extends BlockContainer {
 
     @Override
     public int getComparatorInputOverride(World world, int x, int y, int z, int side) {
-        return Container.calcRedstoneFromInventory((IInventory) world.getTileEntity(x, y, z));
+        TileEntity te = world.getTileEntity(x, y, z);
+        return te instanceof IInventory ? Container.calcRedstoneFromInventory((IInventory) te) : 0;
     }
 }

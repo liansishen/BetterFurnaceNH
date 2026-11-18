@@ -11,19 +11,16 @@ public final class HopperItemTransfer {
 
     public static ItemStack extractOneItem(IInventory inv, ForgeDirection side) {
         if (inv == null) return null;
-        int[] slots;
-        if (inv instanceof ISidedInventory) {
-            slots = ((ISidedInventory) inv).getAccessibleSlotsFromSide(side.ordinal());
-        } else {
-            slots = new int[inv.getSizeInventory()];
-            for (int i = 0; i < slots.length; i++) slots[i] = i;
-        }
-        for (int slot : slots) {
+        ISidedInventory sided = inv instanceof ISidedInventory ? (ISidedInventory) inv : null;
+        int sideOrd = side.ordinal();
+        int[] slots = sided != null ? sided.getAccessibleSlotsFromSide(sideOrd) : null;
+        int count = sided != null ? (slots != null ? slots.length : 0) : inv.getSizeInventory();
+
+        for (int i = 0; i < count; i++) {
+            int slot = sided != null ? slots[i] : i;
             ItemStack stack = inv.getStackInSlot(slot);
             if (stack == null || stack.stackSize <= 0) continue;
-            if (inv instanceof ISidedInventory) {
-                if (!((ISidedInventory) inv).canExtractItem(slot, stack, side.ordinal())) continue;
-            }
+            if (sided != null && !sided.canExtractItem(slot, stack, sideOrd)) continue;
             ItemStack extracted = inv.decrStackSize(slot, 1);
             if (extracted != null && extracted.stackSize > 0) {
                 inv.markDirty();
@@ -34,32 +31,30 @@ public final class HopperItemTransfer {
     }
 
     public static boolean insertItem(IInventory inv, ItemStack stack, ForgeDirection side) {
-        if (inv == null || stack == null) return false;
-        int[] slots;
-        if (inv instanceof ISidedInventory) {
-            slots = ((ISidedInventory) inv).getAccessibleSlotsFromSide(side.ordinal());
-        } else {
-            slots = new int[inv.getSizeInventory()];
-            for (int i = 0; i < slots.length; i++) slots[i] = i;
-        }
+        if (inv == null || stack == null || stack.stackSize <= 0) return false;
+        ISidedInventory sided = inv instanceof ISidedInventory ? (ISidedInventory) inv : null;
+        int sideOrd = side.ordinal();
+        int[] slots = sided != null ? sided.getAccessibleSlotsFromSide(sideOrd) : null;
+        int count = sided != null ? (slots != null ? slots.length : 0) : inv.getSizeInventory();
+
         int remaining = stack.stackSize;
-        for (int slot : slots) {
-            if (remaining <= 0) break;
-            if (inv instanceof ISidedInventory) {
-                if (!((ISidedInventory) inv).canInsertItem(slot, stack, side.ordinal())) continue;
-            }
+        int invMax = inv.getInventoryStackLimit();
+        for (int i = 0; i < count && remaining > 0; i++) {
+            int slot = sided != null ? slots[i] : i;
+            if (!inv.isItemValidForSlot(slot, stack)) continue;
+            if (sided != null && !sided.canInsertItem(slot, stack, sideOrd)) continue;
+
             ItemStack existing = inv.getStackInSlot(slot);
-            int max = inv.getInventoryStackLimit();
             if (existing != null) {
                 if (!existing.isItemEqual(stack) || !ItemStack.areItemStackTagsEqual(existing, stack)) continue;
-                int space = Math.min(max, existing.getMaxStackSize()) - existing.stackSize;
+                int space = Math.min(invMax, existing.getMaxStackSize()) - existing.stackSize;
                 if (space <= 0) continue;
                 int toAdd = Math.min(remaining, space);
                 existing.stackSize += toAdd;
                 remaining -= toAdd;
             } else {
-                int space = max;
-                int toAdd = Math.min(remaining, Math.min(space, stack.getMaxStackSize()));
+                int toAdd = Math.min(remaining, Math.min(invMax, stack.getMaxStackSize()));
+                if (toAdd <= 0) continue;
                 ItemStack copy = stack.copy();
                 copy.stackSize = toAdd;
                 inv.setInventorySlotContents(slot, copy);

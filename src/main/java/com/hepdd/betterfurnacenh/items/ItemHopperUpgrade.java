@@ -14,8 +14,8 @@ import net.minecraftforge.common.util.ForgeDirection;
 
 import com.hepdd.betterfurnacenh.BFNH;
 import com.hepdd.betterfurnacenh.Config;
-import com.hepdd.betterfurnacenh.client.overlay.GridMath;
 import com.hepdd.betterfurnacenh.tileentities.TileEntityBFFurnace;
+import com.hepdd.betterfurnacenh.util.WrenchGridUtil;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -44,6 +44,7 @@ public class ItemHopperUpgrade extends Item {
     }
 
     @Override
+    @SideOnly(Side.CLIENT)
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public void addInformation(ItemStack stack, EntityPlayer player, List tooltip, boolean showAdvanced) {
         double itemsPerSec = (double) Config.hopperItemsPerTransfer / Config.hopperTransferRate * 20.0;
@@ -61,7 +62,7 @@ public class ItemHopperUpgrade extends Item {
         if (!(te instanceof TileEntityBFFurnace)) return false;
         TileEntityBFFurnace furnace = (TileEntityBFFurnace) te;
 
-        ForgeDirection targetSide = GridMath
+        ForgeDirection targetSide = WrenchGridUtil
             .determineWrenchingSide(ForgeDirection.getOrientation(side), hitX, hitY, hitZ);
         if (targetSide != ForgeDirection.UP && targetSide != ForgeDirection.DOWN) return false;
         if (furnace.isHopperInstalled(targetSide)) return false;

@@ -47,3 +47,5 @@ betterfurnacenh.config.diamondSpeedMultiplier.tooltip=Speed multiplier relative 
 betterfurnacenh.config.fluidTankCapacity.tooltip=Fluid tank capacity in L. Range: 1000-32000.
 betterfurnacenh.config.lavaBurnPerBucket.tooltip=Burn time (ticks) per 1000L (1 bucket) of Lava.
 betterfurnacenh.config.creosoteBurnPerBucket.tooltip=Burn time (ticks) per 1000L (1 bucket) of Creosote.
+betterfurnacenh.config.hopperTransferRate.tooltip=Ticks between each auto input/output transfer. Range: 1-200.
+betterfurnacenh.config.hopperItemsPerTransfer.tooltip=Maximum items transferred per operation. Range: 1-64.

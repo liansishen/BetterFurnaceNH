@@ -7,9 +7,12 @@ import net.minecraftforge.common.MinecraftForge;
 
 import com.hepdd.betterfurnacenh.client.gui.GuiBFFurnace;
 import com.hepdd.betterfurnacenh.client.overlay.HopperGridOverlay;
+import com.hepdd.betterfurnacenh.compat.NEICompat;
 import com.hepdd.betterfurnacenh.tileentities.TileEntityBFFurnace;
 
+import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
+import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 
 public class ClientProxy extends CommonProxy {
 
@@ -17,6 +20,14 @@ public class ClientProxy extends CommonProxy {
     public void init(FMLInitializationEvent event) {
         super.init(event);
         MinecraftForge.EVENT_BUS.register(new HopperGridOverlay());
+    }
+
+    @Override
+    public void postInit(FMLPostInitializationEvent event) {
+        super.postInit(event);
+        if (Loader.isModLoaded("NotEnoughItems")) {
+            NEICompat.register();
+        }
     }
 
     @Override

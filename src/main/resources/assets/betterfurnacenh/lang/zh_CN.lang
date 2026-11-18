@@ -47,3 +47,5 @@ betterfurnacenh.config.diamondSpeedMultiplier.tooltip=相对于金熔炉的速�
 betterfurnacenh.config.fluidTankCapacity.tooltip=流体槽容量（单位：L）。范围：1000-32000。
 betterfurnacenh.config.lavaBurnPerBucket.tooltip=每 1000L（1 桶）岩浆提供的燃烧时间（tick）。
 betterfurnacenh.config.creosoteBurnPerBucket.tooltip=每 1000L（1 桶）杂酚油提供的燃烧时间（tick）。
+betterfurnacenh.config.hopperTransferRate.tooltip=每次自动输入/输出传输的间隔（单位：tick）。范围：1-200。
+betterfurnacenh.config.hopperItemsPerTransfer.tooltip=单次传输的最大物品数量。范围：1-64。

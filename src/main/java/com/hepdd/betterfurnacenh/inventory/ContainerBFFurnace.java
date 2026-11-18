@@ -7,7 +7,6 @@ import net.minecraft.inventory.ICrafting;
 import net.minecraft.inventory.Slot;
 import net.minecraft.inventory.SlotFurnace;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.crafting.FurnaceRecipes;
 import net.minecraft.tileentity.TileEntityFurnace;
 import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.Fluid;
@@ -22,16 +21,38 @@ import cpw.mods.fml.relauncher.SideOnly;
 
 public class ContainerBFFurnace extends Container {
 
+    private static final int ID_COOK_TIME_X100 = 0;
+    private static final int ID_BURN_TIME_LOW = 1;
+    private static final int ID_ITEM_BURN_TIME_LOW = 2;
+    private static final int ID_FLUID_AMOUNT = 3;
+    private static final int ID_FLUID_ID = 4;
+    private static final int ID_TOP_HOPPER_INSTALLED = 5;
+    private static final int ID_BOTTOM_HOPPER_INSTALLED = 6;
+    private static final int ID_TOP_HOPPER_ENABLED = 7;
+    private static final int ID_BOTTOM_HOPPER_ENABLED = 8;
+    private static final int ID_BURN_TIME_HIGH = 9;
+    private static final int ID_ITEM_BURN_TIME_HIGH = 10;
+
     private final TileEntityBFFurnace tileFurnace;
-    private int lastCookTime;
-    private int lastBurnTime;
-    private int lastItemBurnTime;
+
+    private int lastCookTimeX100;
+    private int lastBurnTimeLow;
+    private int lastBurnTimeHigh;
+    private int lastItemBurnTimeLow;
+    private int lastItemBurnTimeHigh;
     private int lastFluidAmount;
-    private int lastFluidID;
+    private int lastFluidID = -1;
     private int lastTopHopperInstalled;
     private int lastBottomHopperInstalled;
     private int lastTopHopperEnabled;
     private int lastBottomHopperEnabled;
+
+    private int clientBurnTimeLow;
+    private int clientBurnTimeHigh;
+    private int clientItemBurnTimeLow;
+    private int clientItemBurnTimeHigh;
+    private int clientFluidID = -1;
+    private int clientFluidAmount = 0;
 
     public ContainerBFFurnace(InventoryPlayer invPlayer, TileEntityBFFurnace tileFurnace) {
         this.tileFurnace = tileFurnace;
@@ -50,120 +71,216 @@ public class ContainerBFFurnace extends Container {
         }
     }
 
+    public TileEntityBFFurnace getTileFurnace() {
+        return tileFurnace;
+    }
+
+    public static int toSyncedCookTimeX100(float cookTime) {
+        if (cookTime <= 0f || Float.isNaN(cookTime)) return 0;
+        int scaled = Math.round(cookTime * 100f);
+        return Math.max(0, Math.min(scaled, 32767));
+    }
+
+    public static int toSyncedBurnTicks(float ticks) {
+        if (ticks <= 0f || Float.isNaN(ticks)) return 0;
+        double ceil = Math.ceil(ticks);
+        return ceil >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) ceil;
+    }
+
+    public static int packLow16(int value) {
+        return value & 0xFFFF;
+    }
+
+    public static int packHigh16(int value) {
+        return (value >>> 16) & 0xFFFF;
+    }
+
+    public static int unpackInt32(int high16, int low16) {
+        return ((high16 & 0xFFFF) << 16) | (low16 & 0xFFFF);
+    }
+
     @Override
     public void addCraftingToCrafters(ICrafting crafting) {
         super.addCraftingToCrafters(crafting);
-        crafting.sendProgressBarUpdate(this, 0, (int) tileFurnace.furnaceCookTime);
-        crafting.sendProgressBarUpdate(this, 1, (int) tileFurnace.furnaceBurnTime);
-        crafting.sendProgressBarUpdate(this, 2, (int) tileFurnace.currentItemBurnTime);
+
+        int cookX100 = toSyncedCookTimeX100(tileFurnace.furnaceCookTime);
+        int burnTicks = toSyncedBurnTicks(tileFurnace.furnaceBurnTime);
+        int burnLow = packLow16(burnTicks);
+        int burnHigh = packHigh16(burnTicks);
+        int itemBurnTicks = toSyncedBurnTicks(tileFurnace.currentItemBurnTime);
+        int itemBurnLow = packLow16(itemBurnTicks);
+        int itemBurnHigh = packHigh16(itemBurnTicks);
+
         FluidStack fluid = tileFurnace.fluidTank.getFluid();
-        crafting.sendProgressBarUpdate(this, 4, fluid != null ? fluid.getFluidID() : -1);
-        crafting.sendProgressBarUpdate(this, 3, fluid != null ? fluid.amount : 0);
-        crafting.sendProgressBarUpdate(this, 5, tileFurnace.isHopperInstalled(ForgeDirection.UP) ? 1 : 0);
-        crafting.sendProgressBarUpdate(this, 6, tileFurnace.isHopperInstalled(ForgeDirection.DOWN) ? 1 : 0);
-        crafting.sendProgressBarUpdate(this, 7, tileFurnace.isHopperEnabled(ForgeDirection.UP) ? 1 : 0);
-        crafting.sendProgressBarUpdate(this, 8, tileFurnace.isHopperEnabled(ForgeDirection.DOWN) ? 1 : 0);
+        int fluidID = (fluid != null && fluid.amount > 0) ? fluid.getFluidID() : -1;
+        int fluidAmount = (fluid != null && fluid.amount > 0) ? fluid.amount : 0;
+
+        int topInst = tileFurnace.isHopperInstalled(ForgeDirection.UP) ? 1 : 0;
+        int botInst = tileFurnace.isHopperInstalled(ForgeDirection.DOWN) ? 1 : 0;
+        int topEn = tileFurnace.isHopperEnabled(ForgeDirection.UP) ? 1 : 0;
+        int botEn = tileFurnace.isHopperEnabled(ForgeDirection.DOWN) ? 1 : 0;
+
+        crafting.sendProgressBarUpdate(this, ID_COOK_TIME_X100, cookX100);
+        crafting.sendProgressBarUpdate(this, ID_BURN_TIME_HIGH, burnHigh);
+        crafting.sendProgressBarUpdate(this, ID_BURN_TIME_LOW, burnLow);
+        crafting.sendProgressBarUpdate(this, ID_ITEM_BURN_TIME_HIGH, itemBurnHigh);
+        crafting.sendProgressBarUpdate(this, ID_ITEM_BURN_TIME_LOW, itemBurnLow);
+        crafting.sendProgressBarUpdate(this, ID_FLUID_ID, fluidID);
+        crafting.sendProgressBarUpdate(this, ID_FLUID_AMOUNT, fluidAmount);
+        crafting.sendProgressBarUpdate(this, ID_TOP_HOPPER_INSTALLED, topInst);
+        crafting.sendProgressBarUpdate(this, ID_BOTTOM_HOPPER_INSTALLED, botInst);
+        crafting.sendProgressBarUpdate(this, ID_TOP_HOPPER_ENABLED, topEn);
+        crafting.sendProgressBarUpdate(this, ID_BOTTOM_HOPPER_ENABLED, botEn);
+
+        lastCookTimeX100 = cookX100;
+        lastBurnTimeLow = burnLow;
+        lastBurnTimeHigh = burnHigh;
+        lastItemBurnTimeLow = itemBurnLow;
+        lastItemBurnTimeHigh = itemBurnHigh;
+        lastFluidID = fluidID;
+        lastFluidAmount = fluidAmount;
+        lastTopHopperInstalled = topInst;
+        lastBottomHopperInstalled = botInst;
+        lastTopHopperEnabled = topEn;
+        lastBottomHopperEnabled = botEn;
     }
 
     @Override
     public void detectAndSendChanges() {
         super.detectAndSendChanges();
+
+        int cookX100 = toSyncedCookTimeX100(tileFurnace.furnaceCookTime);
+        int burnTicks = toSyncedBurnTicks(tileFurnace.furnaceBurnTime);
+        int burnLow = packLow16(burnTicks);
+        int burnHigh = packHigh16(burnTicks);
+        int itemBurnTicks = toSyncedBurnTicks(tileFurnace.currentItemBurnTime);
+        int itemBurnLow = packLow16(itemBurnTicks);
+        int itemBurnHigh = packHigh16(itemBurnTicks);
+
+        FluidStack fluid = tileFurnace.fluidTank.getFluid();
+        int fluidID = (fluid != null && fluid.amount > 0) ? fluid.getFluidID() : -1;
+        int fluidAmount = (fluid != null && fluid.amount > 0) ? fluid.amount : 0;
+
+        int topInst = tileFurnace.isHopperInstalled(ForgeDirection.UP) ? 1 : 0;
+        int botInst = tileFurnace.isHopperInstalled(ForgeDirection.DOWN) ? 1 : 0;
+        int topEn = tileFurnace.isHopperEnabled(ForgeDirection.UP) ? 1 : 0;
+        int botEn = tileFurnace.isHopperEnabled(ForgeDirection.DOWN) ? 1 : 0;
+
         for (Object crafter : crafters) {
             ICrafting crafting = (ICrafting) crafter;
 
-            int currentCookTime = (int) tileFurnace.furnaceCookTime;
-            int currentBurnTime = (int) tileFurnace.furnaceBurnTime;
-            int currentItemBurn = (int) tileFurnace.currentItemBurnTime;
-            if (lastCookTime != currentCookTime) {
-                crafting.sendProgressBarUpdate(this, 0, currentCookTime);
+            if (lastCookTimeX100 != cookX100) {
+                crafting.sendProgressBarUpdate(this, ID_COOK_TIME_X100, cookX100);
             }
-            if (lastBurnTime != currentBurnTime) {
-                crafting.sendProgressBarUpdate(this, 1, currentBurnTime);
+            if (lastBurnTimeHigh != burnHigh) {
+                crafting.sendProgressBarUpdate(this, ID_BURN_TIME_HIGH, burnHigh);
             }
-            if (lastItemBurnTime != currentItemBurn) {
-                crafting.sendProgressBarUpdate(this, 2, currentItemBurn);
+            if (lastBurnTimeLow != burnLow) {
+                crafting.sendProgressBarUpdate(this, ID_BURN_TIME_LOW, burnLow);
             }
-
-            FluidStack fluid = tileFurnace.fluidTank.getFluid();
-            int fluidAmount = fluid != null ? fluid.amount : 0;
-            int fluidID = fluid != null ? fluid.getFluidID() : -1;
-
+            if (lastItemBurnTimeHigh != itemBurnHigh) {
+                crafting.sendProgressBarUpdate(this, ID_ITEM_BURN_TIME_HIGH, itemBurnHigh);
+            }
+            if (lastItemBurnTimeLow != itemBurnLow) {
+                crafting.sendProgressBarUpdate(this, ID_ITEM_BURN_TIME_LOW, itemBurnLow);
+            }
             if (lastFluidID != fluidID) {
-                crafting.sendProgressBarUpdate(this, 4, fluidID);
+                crafting.sendProgressBarUpdate(this, ID_FLUID_ID, fluidID);
             }
             if (lastFluidAmount != fluidAmount) {
-                crafting.sendProgressBarUpdate(this, 3, fluidAmount);
+                crafting.sendProgressBarUpdate(this, ID_FLUID_AMOUNT, fluidAmount);
             }
-
-            int topInst = tileFurnace.isHopperInstalled(ForgeDirection.UP) ? 1 : 0;
-            int botInst = tileFurnace.isHopperInstalled(ForgeDirection.DOWN) ? 1 : 0;
-            int topEn = tileFurnace.isHopperEnabled(ForgeDirection.UP) ? 1 : 0;
-            int botEn = tileFurnace.isHopperEnabled(ForgeDirection.DOWN) ? 1 : 0;
-
             if (lastTopHopperInstalled != topInst) {
-                crafting.sendProgressBarUpdate(this, 5, topInst);
+                crafting.sendProgressBarUpdate(this, ID_TOP_HOPPER_INSTALLED, topInst);
             }
             if (lastBottomHopperInstalled != botInst) {
-                crafting.sendProgressBarUpdate(this, 6, botInst);
+                crafting.sendProgressBarUpdate(this, ID_BOTTOM_HOPPER_INSTALLED, botInst);
             }
             if (lastTopHopperEnabled != topEn) {
-                crafting.sendProgressBarUpdate(this, 7, topEn);
+                crafting.sendProgressBarUpdate(this, ID_TOP_HOPPER_ENABLED, topEn);
             }
             if (lastBottomHopperEnabled != botEn) {
-                crafting.sendProgressBarUpdate(this, 8, botEn);
+                crafting.sendProgressBarUpdate(this, ID_BOTTOM_HOPPER_ENABLED, botEn);
             }
         }
-        lastCookTime = (int) tileFurnace.furnaceCookTime;
-        lastBurnTime = (int) tileFurnace.furnaceBurnTime;
-        lastItemBurnTime = (int) tileFurnace.currentItemBurnTime;
-        FluidStack fluid = tileFurnace.fluidTank.getFluid();
-        lastFluidAmount = fluid != null ? fluid.amount : 0;
-        lastFluidID = fluid != null ? fluid.getFluidID() : -1;
-        lastTopHopperInstalled = tileFurnace.isHopperInstalled(ForgeDirection.UP) ? 1 : 0;
-        lastBottomHopperInstalled = tileFurnace.isHopperInstalled(ForgeDirection.DOWN) ? 1 : 0;
-        lastTopHopperEnabled = tileFurnace.isHopperEnabled(ForgeDirection.UP) ? 1 : 0;
-        lastBottomHopperEnabled = tileFurnace.isHopperEnabled(ForgeDirection.DOWN) ? 1 : 0;
+
+        lastCookTimeX100 = cookX100;
+        lastBurnTimeLow = burnLow;
+        lastBurnTimeHigh = burnHigh;
+        lastItemBurnTimeLow = itemBurnLow;
+        lastItemBurnTimeHigh = itemBurnHigh;
+        lastFluidID = fluidID;
+        lastFluidAmount = fluidAmount;
+        lastTopHopperInstalled = topInst;
+        lastBottomHopperInstalled = botInst;
+        lastTopHopperEnabled = topEn;
+        lastBottomHopperEnabled = botEn;
     }
 
     @Override
     @SideOnly(Side.CLIENT)
     public void updateProgressBar(int id, int value) {
         switch (id) {
-            case 0:
-                tileFurnace.furnaceCookTime = value;
+            case ID_COOK_TIME_X100:
+                tileFurnace.furnaceCookTime = Math.max(0f, value / 100f);
                 break;
-            case 1:
-                tileFurnace.furnaceBurnTime = value;
+            case ID_BURN_TIME_LOW:
+                clientBurnTimeLow = value & 0xFFFF;
+                tileFurnace.furnaceBurnTime = Math.max(0, unpackInt32(clientBurnTimeHigh, clientBurnTimeLow));
                 break;
-            case 2:
-                tileFurnace.currentItemBurnTime = value;
+            case ID_BURN_TIME_HIGH:
+                clientBurnTimeHigh = value & 0xFFFF;
+                tileFurnace.furnaceBurnTime = Math.max(0, unpackInt32(clientBurnTimeHigh, clientBurnTimeLow));
                 break;
-            case 3:
-                FluidStack fluid = tileFurnace.fluidTank.getFluid();
-                if (fluid != null) {
-                    fluid.amount = value;
-                } else if (value > 0 && lastFluidID >= 0) {
-                    Fluid f = FluidRegistry.getFluid(lastFluidID);
-                    if (f != null) {
-                        tileFurnace.fluidTank.setFluid(new FluidStack(f, value));
-                    }
-                }
+            case ID_ITEM_BURN_TIME_LOW:
+                clientItemBurnTimeLow = value & 0xFFFF;
+                tileFurnace.currentItemBurnTime = Math
+                    .max(0, unpackInt32(clientItemBurnTimeHigh, clientItemBurnTimeLow));
                 break;
-            case 4:
-                lastFluidID = value;
+            case ID_ITEM_BURN_TIME_HIGH:
+                clientItemBurnTimeHigh = value & 0xFFFF;
+                tileFurnace.currentItemBurnTime = Math
+                    .max(0, unpackInt32(clientItemBurnTimeHigh, clientItemBurnTimeLow));
                 break;
-            case 5:
+            case ID_FLUID_AMOUNT:
+                clientFluidAmount = value & 0xFFFF;
+                applyClientFluid();
+                break;
+            case ID_FLUID_ID:
+                clientFluidID = value;
+                applyClientFluid();
+                break;
+            case ID_TOP_HOPPER_INSTALLED:
                 tileFurnace.setHopperInstalled(ForgeDirection.UP, value != 0);
                 break;
-            case 6:
+            case ID_BOTTOM_HOPPER_INSTALLED:
                 tileFurnace.setHopperInstalled(ForgeDirection.DOWN, value != 0);
                 break;
-            case 7:
+            case ID_TOP_HOPPER_ENABLED:
                 tileFurnace.setHopperEnabled(ForgeDirection.UP, value != 0);
                 break;
-            case 8:
+            case ID_BOTTOM_HOPPER_ENABLED:
                 tileFurnace.setHopperEnabled(ForgeDirection.DOWN, value != 0);
                 break;
+        }
+    }
+
+    @SideOnly(Side.CLIENT)
+    private void applyClientFluid() {
+        if (clientFluidID < 0 || clientFluidAmount <= 0) {
+            tileFurnace.fluidTank.setFluid(null);
+            return;
+        }
+        Fluid f = FluidRegistry.getFluid(clientFluidID);
+        if (f == null) {
+            tileFurnace.fluidTank.setFluid(null);
+            return;
+        }
+        FluidStack current = tileFurnace.fluidTank.getFluid();
+        if (current == null || current.getFluid() != f) {
+            tileFurnace.fluidTank.setFluid(new FluidStack(f, clientFluidAmount));
+        } else {
+            current.amount = clientFluidAmount;
         }
     }
 
@@ -185,8 +302,7 @@ public class ContainerBFFurnace extends Container {
                 slot.onSlotChange(itemstack1, itemstack);
             } else if (slotIndex != 1 && slotIndex != 0) {
                 FluidStack fluidStack = FluidContainerRegistry.getFluidForFilledItem(itemstack1);
-                if (FurnaceRecipes.smelting()
-                    .getSmeltingResult(itemstack1) != null) {
+                if (tileFurnace.canSmeltItem(itemstack1)) {
                     if (!mergeItemStack(itemstack1, 0, 1, false)) return null;
                 } else if (TileEntityFurnace.isItemFuel(itemstack1)
                     || (fluidStack != null && tileFurnace.isValidFuel(fluidStack))) {
